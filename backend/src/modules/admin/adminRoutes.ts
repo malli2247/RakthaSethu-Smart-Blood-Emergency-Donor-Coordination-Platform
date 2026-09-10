@@ -1,10 +1,11 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import {
   getAdminStats,
   listAllUsers,
   updateUserStatus,
   verifyOrganization,
   getVerificationRequests,
+  getAuditLogs,
 } from './adminController';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -18,3 +19,4 @@ adminRouter.get('/users', listAllUsers);
 adminRouter.patch('/users/:id/status', updateUserStatus);
 adminRouter.get('/verifications', getVerificationRequests);
 adminRouter.patch('/verifications/:type/:id', verifyOrganization);
+adminRouter.get('/audit-logs', getAuditLogs);

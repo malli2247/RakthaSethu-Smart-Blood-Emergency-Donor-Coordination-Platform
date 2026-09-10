@@ -1,4 +1,4 @@
-﻿import express, { Express, Request, Response, NextFunction } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
@@ -18,12 +18,16 @@ import { volunteerRouter } from './modules/volunteers/volunteerRoutes';
 import { notificationRouter } from './modules/notifications/notificationRoutes';
 import { adminRouter } from './modules/admin/adminRoutes';
 import { aiRouter } from './modules/ai/aiRoutes';
+import { uploadRouter } from './modules/uploads/uploadRoutes';
 
 export function createApp(): Express {
   const app: Express = express();
 
   // Security headers & CORS
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allows uploaded images/prescriptions to load in frontend
+  }));
+
   app.use(
     cors({
       origin: [config.frontendUrl, 'http://localhost:5173', 'http://localhost:3000'],
@@ -39,6 +43,17 @@ export function createApp(): Express {
   // Body parsers
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Static uploads directory with security headers
+  app.use(
+    '/uploads',
+    (req: Request, res: Response, next: NextFunction) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'");
+      next();
+    },
+    express.static(config.storage.uploadDir)
+  );
 
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
@@ -62,6 +77,7 @@ export function createApp(): Express {
   app.use('/api/notifications', notificationRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/ai', aiRouter);
+  app.use('/api/uploads', uploadRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response, next: NextFunction) => {

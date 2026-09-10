@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { config } from '../../config';
@@ -88,6 +88,10 @@ export async function addInventoryBatch(req: Request, res: Response, next: NextF
     const userId = req.user!.id;
     const { bloodGroup, componentType = 'WHOLE_BLOOD', units, batchNumber, collectionDate, expiryDate } = req.body;
 
+    if (units === undefined || Number(units) <= 0) {
+      throw new AppError('Units must be greater than 0', 400);
+    }
+
     const bloodBank = await prisma.bloodBank.findUnique({ where: { userId } });
     if (!bloodBank) {
       throw new AppError('Blood Bank profile not found', 404);
@@ -132,6 +136,28 @@ export async function updateInventoryStatus(req: Request, res: Response, next: N
   try {
     const { id } = req.params;
     const { status, units } = req.body; // AVAILABLE, RESERVED, EXPIRED, DISCARDED
+    const userId = req.user!.id;
+    const userRole = req.user!.role;
+
+    if (units !== undefined && Number(units) < 0) {
+      throw new AppError('Units cannot be negative', 400);
+    }
+
+    const existingItem = await prisma.bloodInventory.findUnique({
+      where: { id },
+    });
+
+    if (!existingItem) {
+      throw new AppError('Inventory item not found', 404);
+    }
+
+    // IDOR Protection: verify item belongs to user's blood bank if not admin
+    if (userRole !== 'ADMIN') {
+      const bloodBank = await prisma.bloodBank.findUnique({ where: { userId } });
+      if (!bloodBank || existingItem.bloodBankId !== bloodBank.id) {
+        throw new AppError('Unauthorized: You can only modify your own inventory records', 403);
+      }
+    }
 
     const updated = await prisma.bloodInventory.update({
       where: { id },

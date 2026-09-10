@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { RequestService } from './requestService';
 import { sendSuccess, AppError } from '../../utils/response';
 
@@ -23,7 +23,7 @@ export async function listRequests(req: Request, res: Response, next: NextFuncti
 
 export async function getRequestById(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const request = await RequestService.getRequestById(req.params.id);
+    const request = await RequestService.getRequestById(req.params.id, req.user?.id, req.user?.role);
     sendSuccess(res, request);
   } catch (error) {
     next(error);
@@ -34,7 +34,8 @@ export async function updateRequestStatus(req: Request, res: Response, next: Nex
   try {
     const { status, notes } = req.body;
     const userId = req.user!.id;
-    const updated = await RequestService.updateStatus(req.params.id, status, userId, notes);
+    const userRole = req.user!.role;
+    const updated = await RequestService.updateStatus(req.params.id, status, userId, userRole, notes);
     sendSuccess(res, updated, `Request status updated to ${status}`);
   } catch (error) {
     next(error);

@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import {
   register,
   login,
@@ -6,6 +6,9 @@ import {
   logout,
   getMe,
   changePassword,
+  forgotPassword,
+  resetPassword,
+  verifyEmail,
 } from './authController';
 import { validate } from '../../middleware/validate';
 import {
@@ -13,6 +16,9 @@ import {
   loginSchema,
   refreshTokenSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
 } from './authSchemas';
 import { authenticateToken } from '../../middleware/auth';
 import { authLimiter } from '../../middleware/rateLimiter';
@@ -30,3 +36,21 @@ authRouter.post(
   validate({ body: changePasswordSchema }),
   changePassword
 );
+authRouter.post(
+  '/forgot-password',
+  authLimiter,
+  validate({ body: forgotPasswordSchema }),
+  forgotPassword
+);
+authRouter.post(
+  '/reset-password',
+  authLimiter,
+  validate({ body: resetPasswordSchema }),
+  resetPassword
+);
+authRouter.post(
+  '/verify-email',
+  validate({ body: verifyEmailSchema }),
+  verifyEmail
+);
+

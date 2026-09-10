@@ -1,9 +1,15 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { config } from '../../config';
 import { sendSuccess, AppError } from '../../utils/response';
+import { EmailService } from '../../services/emailService';
+import { logger } from '../../utils/logger';
+
+// In-memory failed login tracker for brute-force prevention
+const loginAttempts: Map<string, { count: number; lockedUntil?: number }> = new Map();
 
 // Helper to generate access & refresh tokens
 function generateTokens(user: { id: string; email: string; role: string; isVerified: boolean }) {
@@ -192,9 +198,22 @@ export async function register(req: Request, res: Response, next: NextFunction):
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check account lockout
+    const attemptInfo = loginAttempts.get(normalizedEmail);
+    const now = Date.now();
+    if (attemptInfo && attemptInfo.lockedUntil && attemptInfo.lockedUntil > now) {
+      const minutesRemaining = Math.ceil((attemptInfo.lockedUntil - now) / 60000);
+      throw new AppError(
+        `Account temporarily locked due to consecutive failed login attempts. Please try again in ${minutesRemaining} minute(s).`,
+        429,
+        'ACCOUNT_LOCKED'
+      );
+    }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
       include: {
         donorProfile: true,
         patientProfile: true,
@@ -214,8 +233,19 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
+      // Record failed attempt
+      const current = loginAttempts.get(normalizedEmail) || { count: 0 };
+      current.count += 1;
+      if (current.count >= config.constants.MAX_FAILED_LOGIN_ATTEMPTS) {
+        current.lockedUntil = now + config.constants.LOCKOUT_DURATION_MINUTES * 60 * 1000;
+        logger.security('ACCOUNT_LOCKOUT_TRIGGERED', { email: normalizedEmail });
+      }
+      loginAttempts.set(normalizedEmail, current);
       throw new AppError('Invalid email or password.', 401, 'INVALID_CREDENTIALS');
     }
+
+    // Clear failed attempts on successful login
+    loginAttempts.delete(normalizedEmail);
 
     // Update lastLogin
     await prisma.user.update({
@@ -407,8 +437,144 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
       data: { passwordHash: newHash },
     });
 
-    sendSuccess(res, null, 'Password updated successfully');
+    // Revoke all existing refresh tokens for security
+    await prisma.refreshToken.updateMany({
+      where: { userId },
+      data: { revoked: true },
+    });
+
+    sendSuccess(res, null, 'Password updated successfully. Please log in again.');
   } catch (error) {
     next(error);
   }
 }
+
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { donorProfile: true, patientProfile: true, hospitalProfile: true },
+    });
+
+    if (user && user.isActive) {
+      // Invalidate existing reset tokens
+      await prisma.verificationToken.deleteMany({
+        where: { userId: user.id, type: 'PASSWORD_RESET' },
+      });
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      await prisma.verificationToken.create({
+        data: {
+          token,
+          userId: user.id,
+          type: 'PASSWORD_RESET',
+          expiresAt,
+        },
+      });
+
+      const displayName =
+        user.donorProfile?.fullName ||
+        user.patientProfile?.fullName ||
+        user.hospitalProfile?.name ||
+        user.email.split('@')[0];
+
+      await EmailService.sendPasswordResetEmail(user.email, displayName, token);
+      logger.security('PASSWORD_RESET_REQUESTED', { userId: user.id, email: user.email });
+    }
+
+    // Always return success to prevent user enumeration
+    sendSuccess(
+      res,
+      null,
+      'If an account with that email exists, password reset instructions have been sent.'
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token, newPassword } = req.body;
+
+    const resetToken = await prisma.verificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (
+      !resetToken ||
+      resetToken.type !== 'PASSWORD_RESET' ||
+      resetToken.expiresAt < new Date()
+    ) {
+      throw new AppError('Invalid or expired password reset token.', 400, 'INVALID_TOKEN');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await prisma.$transaction(async (tx) => {
+      // Update password
+      await tx.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      });
+
+      // Delete used token
+      await tx.verificationToken.delete({
+        where: { id: resetToken.id },
+      });
+
+      // Revoke all refresh tokens
+      await tx.refreshToken.updateMany({
+        where: { userId: resetToken.userId },
+        data: { revoked: true },
+      });
+    });
+
+    logger.security('PASSWORD_RESET_COMPLETED', { userId: resetToken.userId });
+    sendSuccess(res, null, 'Password has been reset successfully. You can now log in.');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { token } = req.body;
+
+    const verifyToken = await prisma.verificationToken.findUnique({
+      where: { token },
+    });
+
+    if (
+      !verifyToken ||
+      verifyToken.type !== 'EMAIL_VERIFICATION' ||
+      verifyToken.expiresAt < new Date()
+    ) {
+      throw new AppError('Invalid or expired verification token.', 400, 'INVALID_TOKEN');
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: verifyToken.userId },
+        data: { isVerified: true },
+      });
+
+      await tx.verificationToken.delete({
+        where: { id: verifyToken.id },
+      });
+    });
+
+    logger.security('EMAIL_VERIFIED', { userId: verifyToken.userId });
+    sendSuccess(res, null, 'Email verified successfully. Account is now active.');
+  } catch (error) {
+    next(error);
+  }
+}
+

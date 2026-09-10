@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 
 const BloodGroupEnum = z.enum([
   'A_POSITIVE',
@@ -125,3 +125,8 @@ export const resetPasswordSchema = z.object({
   token: z.string().min(1, 'Token is required'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters long'),
 });
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Verification token is required'),
+});
+

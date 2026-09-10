@@ -1,19 +1,23 @@
-﻿import { createApp } from './app';
-import { config } from './config';
+import { createApp } from './app';
+import { config, validateEnvironment } from './config';
 import { connectDatabase } from './config/database';
+import { logger } from './utils/logger';
 
 async function bootstrap() {
+  // Validate startup environment and sanity checks
+  validateEnvironment();
+
   const app = createApp();
 
   // Attempt database connection
   await connectDatabase();
 
   const server = app.listen(config.port, () => {
-    console.log(`=========================================`);
-    console.log(`🩸 RakthaSethu Backend API Server Active`);
-    console.log(`📡 URL: http://localhost:${config.port}`);
-    console.log(`🏥 Environment: ${config.nodeEnv}`);
-    console.log(`=========================================`);
+    logger.info(`=========================================`);
+    logger.info(`🩸 RakthaSethu Backend API Server Active`);
+    logger.info(`📡 URL: http://localhost:${config.port}`);
+    logger.info(`🏥 Environment: ${config.nodeEnv}`);
+    logger.info(`=========================================`);
   });
 
   const shutdown = async () => {

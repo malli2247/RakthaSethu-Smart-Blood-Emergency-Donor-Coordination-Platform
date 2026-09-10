@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
+import { recordAuditLog } from '../../utils/auditLogger';
 
 export async function getAdminStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -107,6 +108,7 @@ export async function updateUserStatus(req: Request, res: Response, next: NextFu
   try {
     const { id } = req.params;
     const { isActive, isVerified } = req.body;
+    const adminId = req.user!.id;
 
     const updated = await prisma.user.update({
       where: { id },
@@ -114,6 +116,17 @@ export async function updateUserStatus(req: Request, res: Response, next: NextFu
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
         ...(isVerified !== undefined && { isVerified: Boolean(isVerified) }),
       },
+    });
+
+    // Record audit log
+    await recordAuditLog({
+      userId: adminId,
+      action: 'UPDATE_USER_STATUS',
+      entity: 'User',
+      entityId: id,
+      details: { isActive, isVerified },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
     });
 
     sendSuccess(res, updated, 'User status updated');
@@ -126,6 +139,7 @@ export async function verifyOrganization(req: Request, res: Response, next: Next
   try {
     const { type, id } = req.params; // type: 'hospital' | 'blood-bank'
     const { status, notes } = req.body; // status: 'VERIFIED' | 'REJECTED'
+    const adminId = req.user!.id;
 
     if (!['VERIFIED', 'REJECTED'].includes(status)) {
       throw new AppError('Status must be VERIFIED or REJECTED', 400);
@@ -146,6 +160,16 @@ export async function verifyOrganization(req: Request, res: Response, next: Next
         },
       });
 
+      await recordAuditLog({
+        userId: adminId,
+        action: `VERIFY_HOSPITAL_${status}`,
+        entity: 'Hospital',
+        entityId: id,
+        details: { status, notes },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
       sendSuccess(res, updated, `Hospital verification updated to ${status}`);
     } else if (type === 'blood-bank') {
       const updated = await prisma.bloodBank.update({
@@ -158,6 +182,16 @@ export async function verifyOrganization(req: Request, res: Response, next: Next
             update: { isVerified: status === 'VERIFIED' },
           },
         },
+      });
+
+      await recordAuditLog({
+        userId: adminId,
+        action: `VERIFY_BLOOD_BANK_${status}`,
+        entity: 'BloodBank',
+        entityId: id,
+        details: { status, notes },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
       });
 
       sendSuccess(res, updated, `Blood bank verification updated to ${status}`);
@@ -185,6 +219,42 @@ export async function getVerificationRequests(req: Request, res: Response, next:
     sendSuccess(res, {
       hospitals: pendingHospitals,
       bloodBanks: pendingBloodBanks,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getAuditLogs(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { action, entity, userId, page = 1, limit = 50 } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    const where: any = {};
+
+    if (action) where.action = String(action);
+    if (entity) where.entity = String(entity);
+    if (userId) where.userId = String(userId);
+
+    const [total, logs] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: { id: true, email: true, role: true },
+          },
+        },
+      }),
+    ]);
+
+    sendSuccess(res, logs, 'Audit logs retrieved', 200, {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / Number(limit)),
     });
   } catch (error) {
     next(error);
