@@ -1,4 +1,5 @@
-﻿import { PrismaClient, Role, BloodGroup, UrgencyLevel, ComponentType, InventoryStatus } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { Role, BloodGroup, UrgencyLevel, ComponentType, InventoryStatus } from '../src/types/enums';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();

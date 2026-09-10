@@ -1,4 +1,4 @@
-﻿import { prisma } from '../../config/database';
+import { prisma } from '../../config/database';
 import { AppError } from '../../utils/response';
 import { MatchingService } from '../matching/matchingService';
 
@@ -83,8 +83,8 @@ export class RequestService {
     if (status) where.status = status;
     if (urgency) where.urgency = urgency;
     if (bloodGroup) where.bloodGroup = bloodGroup;
-    if (city) where.hospitalCity = { contains: city, mode: 'insensitive' };
-    if (state) where.hospitalState = { contains: state, mode: 'insensitive' };
+    if (city) where.hospitalCity = { contains: city };
+    if (state) where.hospitalState = { contains: state };
     if (requesterId) where.requesterId = requesterId;
 
     const [total, requests] = await Promise.all([

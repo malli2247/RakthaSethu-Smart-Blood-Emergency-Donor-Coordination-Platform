@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 
@@ -62,8 +62,8 @@ export async function listAllUsers(req: Request, res: Response, next: NextFuncti
     if (role) where.role = String(role);
     if (search) {
       where.OR = [
-        { email: { contains: String(search), mode: 'insensitive' } },
-        { phone: { contains: String(search), mode: 'insensitive' } },
+        { email: { contains: String(search) } },
+        { phone: { contains: String(search) } },
       ];
     }
 

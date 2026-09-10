@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 
@@ -7,8 +7,8 @@ export async function listCampaigns(req: Request, res: Response, next: NextFunct
     const { city, state, status } = req.query;
 
     const where: any = {};
-    if (city) where.city = { contains: String(city), mode: 'insensitive' };
-    if (state) where.state = { contains: String(state), mode: 'insensitive' };
+    if (city) where.city = { contains: String(city) };
+    if (state) where.state = { contains: String(state) };
     if (status) where.status = String(status);
 
     const campaigns = await prisma.campaign.findMany({

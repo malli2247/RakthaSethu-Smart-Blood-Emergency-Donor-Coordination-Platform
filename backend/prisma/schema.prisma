@@ -3,88 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-enum Role {
-  DONOR
-  PATIENT
-  ATTENDANT
-  HOSPITAL
-  BLOOD_BANK
-  VOLUNTEER
-  ADMIN
-}
-
-enum BloodGroup {
-  A_POSITIVE
-  A_NEGATIVE
-  B_POSITIVE
-  B_NEGATIVE
-  AB_POSITIVE
-  AB_NEGATIVE
-  O_POSITIVE
-  O_NEGATIVE
-}
-
-enum UrgencyLevel {
-  NORMAL
-  HIGH
-  CRITICAL
-}
-
-enum RequestStatus {
-  PENDING
-  MATCHING
-  DONOR_CONTACTED
-  DONOR_ACCEPTED
-  DONATION_CONFIRMED
-  FULFILLED
-  CANCELLED
-  EXPIRED
-  REJECTED
-}
-
-enum MatchStatus {
-  PENDING
-  NOTIFIED
-  ACCEPTED
-  DECLINED
-  EXPIRED
-}
-
-enum VerificationStatus {
-  PENDING
-  VERIFIED
-  REJECTED
-}
-
-enum InventoryStatus {
-  AVAILABLE
-  RESERVED
-  EXPIRED
-  DISCARDED
-}
-
-enum ComponentType {
-  WHOLE_BLOOD
-  PACKED_RED_CELLS
-  PLATELETS
-  FRESH_FROZEN_PLASMA
-  CRYOPRECIPITATE
-}
-
-enum NotificationType {
-  NEW_REQUEST
-  MATCHING_DONOR_FOUND
-  DONOR_ACCEPTED
-  DONOR_DECLINED
-  REQUEST_FULFILLED
-  REQUEST_CANCELLED
-  EMERGENCY_ALERT
-  ACCOUNT_VERIFICATION
-  SYSTEM_NOTICE
 }
 
 model User {
@@ -92,7 +12,7 @@ model User {
   email            String            @unique
   passwordHash     String
   phone            String?           @unique
-  role             Role              @default(DONOR)
+  role             String            @default("DONOR")
   isActive         Boolean           @default(true)
   isVerified       Boolean           @default(false)
   lastLogin        DateTime?
@@ -147,7 +67,7 @@ model DonorProfile {
   fullName             String
   dateOfBirth          DateTime
   gender               String
-  bloodGroup           BloodGroup
+  bloodGroup           String
   city                 String
   state                String
   address              String
@@ -181,7 +101,7 @@ model PatientProfile {
   fullName             String
   dateOfBirth          DateTime?
   gender               String?
-  bloodGroup           BloodGroup?
+  bloodGroup           String?
   emergencyContactName String?
   emergencyContactPhone String?
   city                 String
@@ -204,7 +124,7 @@ model Hospital {
   longitude            Float?
   contactPerson        String
   contactPhone         String
-  verificationStatus   VerificationStatus @default(PENDING)
+  verificationStatus   String             @default("PENDING")
   verificationNotes    String?
   verifiedAt           DateTime?
   createdAt            DateTime           @default(now())
@@ -230,7 +150,7 @@ model BloodBank {
   contactPerson        String
   contactPhone         String
   storageCapacity      Int                @default(1000)
-  verificationStatus   VerificationStatus @default(PENDING)
+  verificationStatus   String             @default("PENDING")
   verificationNotes    String?
   verifiedAt           DateTime?
   createdAt            DateTime           @default(now())
@@ -266,7 +186,7 @@ model BloodRequest {
   patientName          String
   patientAge           Int?
   patientGender        String?
-  bloodGroup           BloodGroup
+  bloodGroup           String
   unitsRequired        Int           @default(1)
   hospitalName         String
   hospitalCity         String
@@ -275,11 +195,11 @@ model BloodRequest {
   latitude             Float?
   longitude            Float?
   requiredBy           DateTime
-  urgency              UrgencyLevel  @default(NORMAL)
+  urgency              String        @default("NORMAL")
   medicalReason        String?
   contactName          String
   contactPhone         String
-  status               RequestStatus @default(PENDING)
+  status               String        @default("PENDING")
   additionalNotes      String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
@@ -301,7 +221,7 @@ model DonorMatch {
   donor                DonorProfile  @relation(fields: [donorId], references: [id], onDelete: Cascade)
   compatibilityScore   Float
   distanceKm           Float?
-  status               MatchStatus   @default(PENDING)
+  status               String        @default("PENDING")
   contactedAt          DateTime      @default(now())
   respondedAt          DateTime?
   responseNotes        String?
@@ -322,7 +242,7 @@ model Donation {
   hospital             Hospital?     @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
   bloodBankId          String?
   bloodBank            BloodBank?    @relation(fields: [bloodBankId], references: [id], onDelete: SetNull)
-  bloodGroup           BloodGroup
+  bloodGroup           String
   units                Int           @default(1)
   donationDate         DateTime      @default(now())
   certificateCode      String        @unique
@@ -338,13 +258,13 @@ model BloodInventory {
   id                   String          @id @default(uuid())
   bloodBankId          String
   bloodBank            BloodBank       @relation(fields: [bloodBankId], references: [id], onDelete: Cascade)
-  bloodGroup           BloodGroup
-  componentType        ComponentType   @default(WHOLE_BLOOD)
+  bloodGroup           String
+  componentType        String          @default("WHOLE_BLOOD")
   units                Int             @default(0)
   batchNumber          String
   collectionDate       DateTime
   expiryDate           DateTime
-  status               InventoryStatus @default(AVAILABLE)
+  status               String          @default("AVAILABLE")
   createdAt            DateTime        @default(now())
   updatedAt            DateTime        @updatedAt
 
@@ -359,7 +279,7 @@ model Notification {
   user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   title                String
   message              String
-  type                 NotificationType @default(SYSTEM_NOTICE)
+  type                 String           @default("SYSTEM_NOTICE")
   link                 String?
   isRead               Boolean          @default(false)
   createdAt            DateTime         @default(now())

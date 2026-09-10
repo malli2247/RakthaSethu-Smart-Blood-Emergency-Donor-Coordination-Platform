@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 
@@ -62,7 +62,7 @@ export async function getEmergencyCoordinationTasks(req: Request, res: Response,
       where: {
         status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED'] },
         urgency: { in: ['CRITICAL', 'HIGH'] },
-        hospitalCity: { contains: volunteer.serviceAreaCity, mode: 'insensitive' },
+        hospitalCity: { contains: volunteer.serviceAreaCity },
       },
       include: {
         matches: {
