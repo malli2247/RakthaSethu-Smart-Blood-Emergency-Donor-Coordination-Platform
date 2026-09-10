@@ -1,7 +1,7 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { Droplets, Lock, Mail, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { Droplets, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
@@ -54,13 +54,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Quick fill demo credentials for quick review
-  const fillDemo = (demoEmail: string, demoPass = 'Demo@123456') => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError(null);
   };
 
   return (
@@ -135,57 +128,6 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Demo account quick login chips */}
-          <div className="pt-4 border-t border-slate-100">
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2 text-center">
-              Quick Demo Login:
-            </span>
-            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => fillDemo('donor.oneg@rakthasethu.org')}
-                className="p-1.5 rounded-lg bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100 border border-rose-100 truncate"
-              >
-                Donor (O-)
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('donor.bpos@rakthasethu.org')}
-                className="p-1.5 rounded-lg bg-rose-50 text-rose-700 font-semibold hover:bg-rose-100 border border-rose-100 truncate"
-              >
-                Donor (B+)
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('apollo.hospital@rakthasethu.org')}
-                className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700 font-semibold hover:bg-indigo-100 border border-indigo-100 truncate"
-              >
-                Hospital
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('redcross.bloodbank@rakthasethu.org')}
-                className="p-1.5 rounded-lg bg-purple-50 text-purple-700 font-semibold hover:bg-purple-100 border border-purple-100 truncate"
-              >
-                Blood Bank
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('patient@rakthasethu.org')}
-                className="p-1.5 rounded-lg bg-amber-50 text-amber-700 font-semibold hover:bg-amber-100 border border-amber-100 truncate"
-              >
-                Patient
-              </button>
-              <button
-                type="button"
-                onClick={() => fillDemo('admin@rakthasethu.org', 'Admin@123456')}
-                className="p-1.5 rounded-lg bg-slate-100 text-slate-800 font-bold hover:bg-slate-200 border border-slate-300 truncate"
-              >
-                Admin
-              </button>
-            </div>
-          </div>
         </div>
 
         <p className="text-center text-xs text-slate-500">

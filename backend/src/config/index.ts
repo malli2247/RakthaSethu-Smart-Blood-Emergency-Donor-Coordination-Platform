@@ -1,12 +1,21 @@
 ﻿import dotenv from 'dotenv';
+import path from 'path';
+
+// Check all possible .env locations (local backend, root monorepo, cwd)
 dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
 export const config = {
   port: parseInt(process.env.PORT || '5000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/rakthasethu?schema=public',
-  
+  databaseUrl:
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5432/rakthasethu?schema=public',
+
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'rakthasethu_dev_access_secret_key_1234567890',
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'rakthasethu_dev_refresh_secret_key_0987654321',
@@ -40,5 +49,10 @@ export const config = {
     DEFAULT_SEARCH_RADIUS_KM: 50,
     LOW_STOCK_THRESHOLD: 5,
     EXPIRY_WARNING_DAYS: 7,
-  }
+  },
 };
+
+// Guarantee process.env has DATABASE_URL set for Prisma
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = config.databaseUrl;
+}
