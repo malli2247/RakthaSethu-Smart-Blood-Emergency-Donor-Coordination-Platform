@@ -15,6 +15,8 @@ import { FaqPage } from '../pages/public/FaqPage';
 // Auth pages
 import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
+import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
+import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 
 // Donor pages
 import { DonorDashboard } from '../pages/donor/DonorDashboard';
@@ -86,6 +88,8 @@ export const AppRoutes: React.FC = () => {
         <Route path="/faq" element={<FaqPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/patient/create-request" element={<CreateRequestPage />} />
         <Route path="/patient/requests/:id" element={<RequestDetailsPage />} />
         <Route path="/emergency/search/:id" element={<ProgressiveSearchScreen />} />

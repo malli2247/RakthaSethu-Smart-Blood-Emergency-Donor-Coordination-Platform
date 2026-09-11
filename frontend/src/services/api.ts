@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -58,6 +58,8 @@ export const authApi = {
   getMe: () => api.get('/auth/me'),
   logout: (refreshToken?: string) => api.post('/auth/logout', { refreshToken }),
   changePassword: (data: any) => api.post('/auth/change-password', data),
+  forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
 };
 
 export const matchingApi = {

@@ -459,6 +459,8 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       include: { donorProfile: true, patientProfile: true, hospitalProfile: true },
     });
 
+    let generatedDevToken: string | null = null;
+
     if (user && user.isActive) {
       // Invalidate existing reset tokens
       await prisma.verificationToken.deleteMany({
@@ -466,6 +468,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       });
 
       const token = crypto.randomBytes(32).toString('hex');
+      generatedDevToken = token;
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       await prisma.verificationToken.create({
@@ -487,10 +490,10 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
       logger.security('PASSWORD_RESET_REQUESTED', { userId: user.id, email: user.email });
     }
 
-    // Always return success to prevent user enumeration
+    // Always return success to prevent user enumeration (dev token included only in development)
     sendSuccess(
       res,
-      null,
+      process.env.NODE_ENV !== 'production' && generatedDevToken ? { devResetToken: generatedDevToken } : null,
       'If an account with that email exists, password reset instructions have been sent.'
     );
   } catch (error) {
