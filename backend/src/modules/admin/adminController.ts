@@ -3,53 +3,64 @@ import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { recordAuditLog } from '../../utils/auditLogger';
 
+import { CacheService } from '../../services/cacheService';
+
 export async function getAdminStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const [
-      totalUsers,
-      totalDonors,
-      activeDonors,
-      totalRequests,
-      criticalRequests,
-      fulfilledRequests,
-      pendingRequests,
-      totalHospitals,
-      pendingHospitals,
-      totalBloodBanks,
-      pendingBloodBanks,
-      totalDonations,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.donorProfile.count(),
-      prisma.donorProfile.count({ where: { isAvailable: true, isEligible: true } }),
-      prisma.bloodRequest.count(),
-      prisma.bloodRequest.count({ where: { urgency: 'CRITICAL' } }),
-      prisma.bloodRequest.count({ where: { status: 'FULFILLED' } }),
-      prisma.bloodRequest.count({ where: { status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED'] } } }),
-      prisma.hospital.count(),
-      prisma.hospital.count({ where: { verificationStatus: 'PENDING' } }),
-      prisma.bloodBank.count(),
-      prisma.bloodBank.count({ where: { verificationStatus: 'PENDING' } }),
-      prisma.donation.count(),
-    ]);
+    const stats = await CacheService.wrap(
+      'admin_stats',
+      30, // 30 seconds TTL
+      async () => {
+        const [
+          totalUsers,
+          totalDonors,
+          activeDonors,
+          totalRequests,
+          criticalRequests,
+          fulfilledRequests,
+          pendingRequests,
+          totalHospitals,
+          pendingHospitals,
+          totalBloodBanks,
+          pendingBloodBanks,
+          totalDonations,
+        ] = await Promise.all([
+          prisma.user.count(),
+          prisma.donorProfile.count(),
+          prisma.donorProfile.count({ where: { isAvailable: true, isEligible: true } }),
+          prisma.bloodRequest.count(),
+          prisma.bloodRequest.count({ where: { urgency: 'CRITICAL' } }),
+          prisma.bloodRequest.count({ where: { status: 'FULFILLED' } }),
+          prisma.bloodRequest.count({ where: { status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED'] } } }),
+          prisma.hospital.count(),
+          prisma.hospital.count({ where: { verificationStatus: 'PENDING' } }),
+          prisma.bloodBank.count(),
+          prisma.bloodBank.count({ where: { verificationStatus: 'PENDING' } }),
+          prisma.donation.count(),
+        ]);
 
-    const fulfillmentRate = totalRequests > 0 ? Math.round((fulfilledRequests / totalRequests) * 100) : 0;
+        const fulfillmentRate = totalRequests > 0 ? Math.round((fulfilledRequests / totalRequests) * 100) : 0;
 
-    sendSuccess(res, {
-      totalUsers,
-      totalDonors,
-      activeDonors,
-      totalRequests,
-      criticalRequests,
-      fulfilledRequests,
-      pendingRequests,
-      totalHospitals,
-      pendingHospitals,
-      totalBloodBanks,
-      pendingBloodBanks,
-      totalDonations,
-      fulfillmentRate,
-    });
+        return {
+          totalUsers,
+          totalDonors,
+          activeDonors,
+          totalRequests,
+          criticalRequests,
+          fulfilledRequests,
+          pendingRequests,
+          totalHospitals,
+          pendingHospitals,
+          totalBloodBanks,
+          pendingBloodBanks,
+          totalDonations,
+          fulfillmentRate,
+        };
+      },
+      ['stats']
+    );
+
+    sendSuccess(res, stats);
   } catch (error) {
     next(error);
   }

@@ -1,9 +1,26 @@
-﻿import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { config } from './index';
+import { logger } from '../utils/logger';
 
 declare global {
   // eslint-disable-next-line no-var
   var prismaInstance: PrismaClient | undefined;
+}
+
+function getOptimizedDatabaseUrl(): string {
+  const rawUrl = process.env.DATABASE_URL || config.databaseUrl;
+  // If PostgreSQL, ensure connection pooling query parameters are appended if missing
+  if (rawUrl.startsWith('postgresql://') || rawUrl.startsWith('postgres://')) {
+    const url = new URL(rawUrl);
+    if (!url.searchParams.has('connection_limit')) {
+      url.searchParams.set('connection_limit', String(config.scaling?.maxConnectionPool || 50));
+    }
+    if (!url.searchParams.has('pool_timeout')) {
+      url.searchParams.set('pool_timeout', '10');
+    }
+    return url.toString();
+  }
+  return rawUrl;
 }
 
 export const prisma =
@@ -11,11 +28,27 @@ export const prisma =
   new PrismaClient({
     datasources: {
       db: {
-        url: process.env.DATABASE_URL || config.databaseUrl,
+        url: getOptimizedDatabaseUrl(),
       },
     },
-    log: process.env.NODE_ENV === 'development' ? ['query', 'warn', 'error'] : ['error'],
+    log:
+      process.env.NODE_ENV === 'development'
+        ? [
+            { emit: 'event', level: 'query' },
+            { emit: 'stdout', level: 'warn' },
+            { emit: 'stdout', level: 'error' },
+          ]
+        : [{ emit: 'stdout', level: 'error' }],
   });
+
+// Slow query detection instrumentation (logs queries taking longer than 200ms)
+if (process.env.NODE_ENV === 'development') {
+  (prisma as any).$on?.('query', (e: any) => {
+    if (e.duration > 200) {
+      logger.warn(`⚠️ [Slow Query Detected] ${e.duration}ms: ${e.query.substring(0, 120)}...`);
+    }
+  });
+}
 
 if (process.env.NODE_ENV !== 'production') {
   global.prismaInstance = prisma;
@@ -24,11 +57,10 @@ if (process.env.NODE_ENV !== 'production') {
 export async function connectDatabase(): Promise<boolean> {
   try {
     await prisma.$connect();
-    console.log('✅ Connected to PostgreSQL database successfully.');
+    logger.info('✅ Database connection established with optimized pool.');
     return true;
   } catch (error) {
-    console.error('⚠️ Could not connect to PostgreSQL database:', (error as Error).message);
-    console.warn('⚠️ If running in development without PostgreSQL, run `docker compose up -d postgres` or start a PostgreSQL instance.');
+    logger.error(`⚠️ Database connection warning: ${(error as Error).message}`);
     return false;
   }
 }

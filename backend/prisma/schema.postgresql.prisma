@@ -159,6 +159,9 @@ model DonorProfile {
   emergencyAvailable   Boolean       @default(true)
   totalDonations       Int           @default(0)
   livesSavedEstimate   Int           @default(0)
+  impactScore          Int           @default(0)
+  badges               String        @default("[]")
+  availabilityStatus   String        @default("AVAILABLE")
   consentGiven         Boolean       @default(true)
   hidePhoneNumber      Boolean       @default(false)
   hideExactAddress     Boolean       @default(true)
@@ -172,6 +175,9 @@ model DonorProfile {
   @@index([bloodGroup])
   @@index([city, state])
   @@index([isAvailable, isEligible])
+  @@index([isAvailable, isEligible, bloodGroup])
+  @@index([isAvailable, emergencyAvailable])
+  @@index([availabilityStatus])
 }
 
 model PatientProfile {
@@ -286,11 +292,15 @@ model BloodRequest {
 
   matches              DonorMatch[]
   donations            Donation[]
+  searches             EmergencySearch[]
+  coordinationRoom     EmergencyCoordinationRoom?
 
   @@index([bloodGroup])
   @@index([hospitalCity, hospitalState])
   @@index([status])
   @@index([urgency])
+  @@index([status, urgency, createdAt])
+  @@index([bloodGroup, hospitalCity, status])
 }
 
 model DonorMatch {
@@ -349,6 +359,7 @@ model BloodInventory {
   updatedAt            DateTime        @updatedAt
 
   @@index([bloodBankId, bloodGroup])
+  @@index([bloodBankId, bloodGroup, expiryDate])
   @@index([expiryDate])
   @@index([status])
 }
@@ -426,3 +437,104 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
 }
+
+model EmergencySearch {
+  id                   String                @id @default(uuid())
+  requestId            String
+  request              BloodRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  urgency              String                @default("NORMAL")
+  currentRadiusKm      Float                 @default(5.0)
+  maxRadiusKm          Float                 @default(20.0)
+  status               String                @default("IN_PROGRESS")
+  targetDonorsNeeded   Int                   @default(5)
+  donorsFoundCount     Int                   @default(0)
+  donorsContactedCount Int                   @default(0)
+  startedAt            DateTime              @default(now())
+  completedAt          DateTime?
+  escalationPlan       String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  radiusAttempts       SearchRadiusAttempt[]
+
+  @@index([requestId])
+  @@index([status])
+}
+
+model SearchRadiusAttempt {
+  id                   String                @id @default(uuid())
+  searchId             String
+  search               EmergencySearch       @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  radiusKm             Float
+  donorsFound          Int                   @default(0)
+  cumulativeDonors     Int                   @default(0)
+  isSufficient         Boolean               @default(false)
+  candidateDonorIds    String?
+  attemptedAt          DateTime              @default(now())
+
+  @@index([searchId])
+}
+
+model EmergencyCoordinationRoom {
+  id                   String                @id @default(uuid())
+  requestId            String                @unique
+  request              BloodRequest          @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  status               String                @default("ACTIVE")
+  unitsSecured         Int                   @default(0)
+  unitsTarget          Int                   @default(1)
+  hospitalNotes        String?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  resolvedAt           DateTime?
+
+  messages             EmergencyMessage[]
+
+  @@index([status])
+}
+
+model EmergencyMessage {
+  id                   String                     @id @default(uuid())
+  roomId               String
+  room                 EmergencyCoordinationRoom  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId             String
+  senderName           String
+  senderRole           String
+  message              String
+  messageType          String                     @default("TEXT")
+  isPredefined         Boolean                    @default(false)
+  createdAt            DateTime                   @default(now())
+
+  @@index([roomId])
+  @@index([createdAt])
+}
+
+model ModelPrediction {
+  id                   String                @id @default(uuid())
+  modelType            String
+  modelVersion         String                @default("1.0.0")
+  entityId             String?
+  inputFeatures        String
+  predictionOutput     String
+  confidence           Float                 @default(1.0)
+  actualOutcome        String?
+  createdAt            DateTime              @default(now())
+
+  @@index([modelType])
+  @@index([entityId])
+  @@index([createdAt])
+}
+
+model OfflineSyncEvent {
+  id                   String                @id @default(uuid())
+  idempotencyKey       String                @unique
+  userId               String?
+  actionType           String
+  payload              String
+  status               String                @default("PENDING")
+  resultDetails        String?
+  syncedAt             DateTime              @default(now())
+
+  @@index([idempotencyKey])
+  @@index([status])
+}
+

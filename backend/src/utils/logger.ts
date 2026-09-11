@@ -44,6 +44,17 @@ function sanitize(data: any): any {
 }
 
 export const logger = {
+  debug(message: string, meta?: any) {
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+      const timestamp = new Date().toISOString();
+      if (meta !== undefined) {
+        console.debug(`[${timestamp}] [DEBUG] ${message}`, JSON.stringify(sanitize(meta)));
+      } else {
+        console.debug(`[${timestamp}] [DEBUG] ${message}`);
+      }
+    }
+  },
+
   info(message: string, meta?: any) {
     const timestamp = new Date().toISOString();
     if (meta !== undefined) {

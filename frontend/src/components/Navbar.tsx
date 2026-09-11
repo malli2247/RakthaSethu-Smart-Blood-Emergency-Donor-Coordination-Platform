@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -12,11 +12,14 @@ import {
   Bell,
   Activity,
   ShieldAlert,
+  Globe,
 } from 'lucide-react';
 import { notificationApi } from '../services/api';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
+  const { language, setLanguage, t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -124,6 +127,16 @@ export const Navbar: React.FC = () => {
 
           {/* Action CTAs */}
           <div className="hidden lg:flex items-center gap-3">
+            {/* Language Switcher */}
+            <button
+              onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
+              title="Change Language"
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-500" />
+              <span>{language === 'en' ? 'हिन्दी' : 'English'}</span>
+            </button>
+
             {/* Emergency Request Button */}
             <Link
               to="/patient/create-request"
@@ -240,6 +253,16 @@ export const Navbar: React.FC = () => {
           </Link>
 
           <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setLanguage(language === 'en' ? 'hi' : 'en');
+                setMobileMenuOpen(false);
+              }}
+              className="w-full py-2 px-3 text-center rounded-lg border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2"
+            >
+              <Globe className="w-4 h-4 text-slate-500" />
+              <span>Switch Language: {language === 'en' ? 'हिन्दी' : 'English'}</span>
+            </button>
             {isAuthenticated ? (
               <>
                 <Link

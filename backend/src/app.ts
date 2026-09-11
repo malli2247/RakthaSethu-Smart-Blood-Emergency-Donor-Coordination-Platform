@@ -17,16 +17,39 @@ import { campaignRouter } from './modules/campaigns/campaignRoutes';
 import { volunteerRouter } from './modules/volunteers/volunteerRoutes';
 import { notificationRouter } from './modules/notifications/notificationRoutes';
 import { adminRouter } from './modules/admin/adminRoutes';
+import compression from 'compression';
 import { aiRouter } from './modules/ai/aiRoutes';
 import { uploadRouter } from './modules/uploads/uploadRoutes';
+import { emergencyRouter } from './modules/emergency/emergencyRoutes';
+import { coordinationRouter } from './modules/coordination/coordinationRoutes';
+import { CacheService } from './services/cacheService';
+import { TaskQueueService } from './services/taskQueueService';
 
 export function createApp(): Express {
   const app: Express = express();
 
+  // Enable strong ETags for HTTP 304 Not Modified caching
+  app.set('etag', 'strong');
+
+  // HTTP Response Compression (Gzip / Deflate for payloads > 1KB)
+  if (config.scaling?.enableCompression !== false) {
+    app.use(
+      compression({
+        threshold: 1024,
+        filter: (req, res) => {
+          if (req.headers['x-no-compression']) return false;
+          return compression.filter(req, res);
+        },
+      })
+    );
+  }
+
   // Security headers & CORS
-  app.use(helmet({
-    crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allows uploaded images/prescriptions to load in frontend
-  }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+  );
 
   app.use(
     cors({
@@ -37,7 +60,7 @@ export function createApp(): Express {
     })
   );
 
-  // Rate Limiting
+  // High-throughput rate limiting (with loopback dev exemption)
   app.use(generalLimiter);
 
   // Body parsers
@@ -65,6 +88,23 @@ export function createApp(): Express {
     });
   });
 
+  // System performance, caching, and concurrency metrics endpoint
+  app.get('/api/system/metrics', (req: Request, res: Response) => {
+    const memUsage = process.memoryUsage();
+    sendSuccess(res, {
+      status: 'operational',
+      uptimeSeconds: Math.floor(process.uptime()),
+      memory: {
+        rssMb: Math.round(memUsage.rss / 1024 / 1024),
+        heapUsedMb: Math.round(memUsage.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(memUsage.heapTotal / 1024 / 1024),
+      },
+      cache: CacheService.getMetrics(),
+      taskQueue: TaskQueueService.getStats(),
+      processId: process.pid,
+    });
+  });
+
   // Mount API modules
   app.use('/api/auth', authRouter);
   app.use('/api/matching', matchingRouter);
@@ -78,6 +118,8 @@ export function createApp(): Express {
   app.use('/api/admin', adminRouter);
   app.use('/api/ai', aiRouter);
   app.use('/api/uploads', uploadRouter);
+  app.use('/api/emergency', emergencyRouter);
+  app.use('/api/coordination', coordinationRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response, next: NextFunction) => {

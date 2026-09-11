@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -13,6 +13,10 @@ import {
   Package,
   Users,
   ShieldCheck,
+  ShieldAlert,
+  Sparkles,
+  Compass,
+  Radio,
   LogOut,
   Bell,
   Menu,
@@ -68,6 +72,7 @@ export const DashboardLayout: React.FC = () => {
         return [
           { label: 'Inventory Overview', path: '/bloodbank/dashboard', icon: LayoutDashboard },
           { label: 'Manage Inventory', path: '/bloodbank/inventory', icon: Package },
+          { label: 'AI Copilot', path: '/bloodbank/copilot', icon: Sparkles },
         ];
       case 'VOLUNTEER':
         return [
@@ -75,7 +80,9 @@ export const DashboardLayout: React.FC = () => {
         ];
       case 'ADMIN':
         return [
-          { label: 'Admin Command Center', path: '/admin/dashboard', icon: LayoutDashboard },
+          { label: 'Admin Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+          { label: 'Command Center', path: '/admin/command-center', icon: ShieldAlert },
+          { label: 'Emergency Simulator', path: '/admin/simulator', icon: Compass },
           { label: 'User Directory', path: '/admin/users', icon: Users },
           { label: 'Verifications', path: '/admin/verifications', icon: ShieldCheck },
         ];

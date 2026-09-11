@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { requestsApi, aiApi } from '../../services/api';
 import { BloodGroup, UrgencyLevel } from '../../types';
@@ -13,7 +13,9 @@ import {
   Heart,
   ArrowRight,
   ShieldCheck,
+  Mic,
 } from 'lucide-react';
+import { VoiceRequestModal } from '../../components/emergency/VoiceRequestModal';
 
 export const CreateRequestPage: React.FC = () => {
   const navigate = useNavigate();
@@ -43,6 +45,20 @@ export const CreateRequestPage: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [voiceModalOpen, setVoiceModalOpen] = useState(false);
+
+  const handleVoiceExtracted = (extracted: {
+    bloodGroup: string;
+    unitsRequired: number;
+    hospitalName: string;
+    urgency: string;
+  }) => {
+    if (extracted.bloodGroup) setBloodGroup(extracted.bloodGroup as BloodGroup);
+    if (extracted.unitsRequired) setUnitsRequired(extracted.unitsRequired);
+    if (extracted.hospitalName) setHospitalName(extracted.hospitalName);
+    if (extracted.urgency) setUrgency(extracted.urgency as UrgencyLevel);
+    setVoiceModalOpen(false);
+  };
 
   const handleAiTriage = async () => {
     if (!medicalReason.trim()) return;
@@ -95,11 +111,23 @@ export const CreateRequestPage: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
-      <div className="text-center max-w-2xl mx-auto space-y-2">
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 text-xs font-bold uppercase tracking-wider">
-          <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-          Immediate Emergency Broadcast
+      <div className="text-center max-w-2xl mx-auto space-y-3">
+        <div className="flex items-center justify-center gap-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-100 text-red-800 text-xs font-bold uppercase tracking-wider">
+            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+            Immediate Emergency Broadcast
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setVoiceModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-900 text-xs font-black uppercase tracking-wider transition border border-indigo-200 shadow-sm"
+          >
+            <Mic className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+            <span>Voice Requisition</span>
+          </button>
         </div>
+
         <h1 className="text-3xl font-black text-slate-900 tracking-tight">
           Create Emergency Blood Request
         </h1>
@@ -381,6 +409,13 @@ export const CreateRequestPage: React.FC = () => {
           <ArrowRight className="w-5 h-5" />
         </button>
       </form>
+
+      {/* Voice Requisition Intake Modal */}
+      <VoiceRequestModal
+        isOpen={voiceModalOpen}
+        onClose={() => setVoiceModalOpen(false)}
+        onConfirmExtracted={handleVoiceExtracted}
+      />
     </div>
   );
 };

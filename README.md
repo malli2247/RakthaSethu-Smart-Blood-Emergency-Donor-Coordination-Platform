@@ -15,6 +15,11 @@
 
 ## 📑 Core Documentation Index
 
+- **[AI_ML_ARCHITECTURE.md](./AI_ML_ARCHITECTURE.md)**: Calibrated logistic regression ML response prediction, multi-factor match scoring, 7-day demand forecasting, and voice entity extraction.
+- **[EMERGENCY_SEARCH.md](./EMERGENCY_SEARCH.md)**: Progressive radius expansion algorithm (5km → 100km), cumulative candidate sets, and real-time coordination rooms.
+- **[OFFLINE_MODE.md](./OFFLINE_MODE.md)**: PWA Service Worker caching, IndexedDB offline action queue, idempotency deduplication, and auto-sync.
+- **[MAP_ARCHITECTURE.md](./MAP_ARCHITECTURE.md)**: Interactive Leaflet GIS maps, concentric radius rings, and dual-tier donor privacy fuzzing (1.2km offset).
+- **[API_DOCUMENTATION.md](./API_DOCUMENTATION.md)**: Complete endpoint reference for emergency, coordination, AI, and blood bank modules.
 - **[PRODUCTION_READINESS_REPORT.md](./PRODUCTION_READINESS_REPORT.md)**: Full verification matrix across all 41 audit phases, test coverage, and security certifications.
 - **[PRODUCTION_AUDIT.md](./PRODUCTION_AUDIT.md)**: Technical vulnerability audit, architectural risk assessments, and remediation ledger.
 - **[PRODUCTION_CREDENTIALS.md](./PRODUCTION_CREDENTIALS.md)**: Configuration guide for PostgreSQL, SMTP Email, Twilio/Fast2SMS, Google Maps, S3/Cloudinary, and Gemini AI.

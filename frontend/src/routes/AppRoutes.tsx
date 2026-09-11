@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { PublicLayout } from '../layouts/PublicLayout';
 import { DashboardLayout } from '../layouts/DashboardLayout';
@@ -42,6 +42,15 @@ import { VolunteerDashboard } from '../pages/volunteer/VolunteerDashboard';
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
 import { AdminVerificationsPage } from '../pages/admin/AdminVerificationsPage';
+import { CommandCenterPage } from '../pages/admin/CommandCenterPage';
+import { EmergencySimulatorPage } from '../pages/admin/EmergencySimulatorPage';
+
+// Blood Bank Copilot
+import { CopilotPage } from '../pages/bloodbank/CopilotPage';
+
+// Emergency Progressive Search & Coordination Room
+import { ProgressiveSearchScreen } from '../pages/emergency/ProgressiveSearchScreen';
+import { CoordinationRoomPage } from '../pages/coordination/CoordinationRoomPage';
 
 const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: string[] }> = ({
   children,
@@ -79,6 +88,8 @@ export const AppRoutes: React.FC = () => {
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/patient/create-request" element={<CreateRequestPage />} />
         <Route path="/patient/requests/:id" element={<RequestDetailsPage />} />
+        <Route path="/emergency/search/:id" element={<ProgressiveSearchScreen />} />
+        <Route path="/coordination/:id" element={<CoordinationRoomPage />} />
       </Route>
 
       {/* Protected Dashboard Routes */}
@@ -106,12 +117,15 @@ export const AppRoutes: React.FC = () => {
         {/* Blood Bank */}
         <Route path="/bloodbank/dashboard" element={<BloodBankDashboard />} />
         <Route path="/bloodbank/inventory" element={<InventoryPage />} />
+        <Route path="/bloodbank/copilot" element={<CopilotPage />} />
 
         {/* Volunteer */}
         <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
 
         {/* Admin */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/command-center" element={<CommandCenterPage />} />
+        <Route path="/admin/simulator" element={<EmergencySimulatorPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
       </Route>

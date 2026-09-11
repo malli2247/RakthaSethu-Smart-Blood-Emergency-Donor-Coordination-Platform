@@ -1,11 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import { RequestService } from './requestService';
 import { sendSuccess, AppError } from '../../utils/response';
+import { CacheService } from '../../services/cacheService';
 
 export async function createRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const requesterId = req.user!.id;
     const request = await RequestService.createRequest(requesterId, req.body);
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, request, 'Emergency blood request created and matching started', 201);
   } catch (error) {
     next(error);
@@ -36,6 +38,7 @@ export async function updateRequestStatus(req: Request, res: Response, next: Nex
     const userId = req.user!.id;
     const userRole = req.user!.role;
     const updated = await RequestService.updateStatus(req.params.id, status, userId, userRole, notes);
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, updated, `Request status updated to ${status}`);
   } catch (error) {
     next(error);

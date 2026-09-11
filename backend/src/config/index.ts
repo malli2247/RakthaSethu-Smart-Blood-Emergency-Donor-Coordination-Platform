@@ -1,4 +1,4 @@
-﻿import dotenv from 'dotenv';
+import dotenv from 'dotenv';
 import path from 'path';
 import { logger } from '../utils/logger';
 
@@ -37,9 +37,18 @@ export const config = {
   },
 
   rateLimit: {
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 mins
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
-    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10', 10),
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10), // 1 minute sliding window
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '10000', 10), // 10,000 requests per minute
+    authMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100', 10), // 100 auth attempts per minute
+    skipLocalhost: process.env.RATE_LIMIT_SKIP_LOCALHOST !== 'false', // Never lock out dev/local testing
+  },
+
+  scaling: {
+    clusterMode: process.env.CLUSTER_MODE === 'true',
+    workers: parseInt(process.env.WEB_CONCURRENCY || '0', 10),
+    cacheTTLSeconds: parseInt(process.env.CACHE_DEFAULT_TTL_SECONDS || '60', 10),
+    enableCompression: process.env.ENABLE_COMPRESSION !== 'false',
+    maxConnectionPool: parseInt(process.env.DATABASE_POOL_SIZE || '50', 10),
   },
 
   email: {
