@@ -133,3 +133,11 @@ export const aiApi = {
   classifyUrgency: (medicalReason: string) => api.post('/ai/classify-urgency', { medicalReason }),
   chat: (question: string) => api.post('/ai/chat', { question }),
 };
+
+export const statisticsApi = {
+  getPublic: () => api.get('/statistics/public'),
+  getActivity: () => api.get('/statistics/activity'),
+  getInventory: () => api.get('/statistics/inventory'),
+  getAdminAnalytics: () => api.get('/statistics/admin'),
+};
+

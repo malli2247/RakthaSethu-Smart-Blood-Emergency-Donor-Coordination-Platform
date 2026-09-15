@@ -7,6 +7,7 @@ import { config } from '../../config';
 import { sendSuccess, AppError } from '../../utils/response';
 import { EmailService } from '../../services/emailService';
 import { logger } from '../../utils/logger';
+import { CacheService } from '../../services/cacheService';
 
 // In-memory failed login tracker for brute-force prevention
 const loginAttempts: Map<string, { count: number; lockedUntil?: number }> = new Map();
@@ -173,6 +174,9 @@ export async function register(req: Request, res: Response, next: NextFunction):
         type: 'SYSTEM_NOTICE',
       },
     });
+
+    // Invalidate public and aggregate statistics cache
+    CacheService.invalidateByTag('stats');
 
     sendSuccess(
       res,

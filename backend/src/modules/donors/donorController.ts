@@ -1,7 +1,8 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { calculateDistanceKm } from '../../utils/distance';
+import { CacheService } from '../../services/cacheService';
 
 export async function getDonorProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -90,6 +91,7 @@ export async function updateDonorProfile(req: Request, res: Response, next: Next
       },
     });
 
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, updated, 'Donor profile updated successfully');
   } catch (error) {
     next(error);
@@ -235,6 +237,7 @@ export async function recordPastDonation(req: Request, res: Response, next: Next
       return rec;
     });
 
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, donation, 'Donation recorded successfully', 201);
   } catch (error) {
     next(error);

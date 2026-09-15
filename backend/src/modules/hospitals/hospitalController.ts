@@ -1,6 +1,7 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
+import { CacheService } from '../../services/cacheService';
 
 export async function getHospitalProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -146,6 +147,7 @@ export async function confirmHospitalDonation(req: Request, res: Response, next:
       return donation;
     });
 
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, result, 'Donation confirmed and certificate generated successfully', 201);
   } catch (error) {
     next(error);

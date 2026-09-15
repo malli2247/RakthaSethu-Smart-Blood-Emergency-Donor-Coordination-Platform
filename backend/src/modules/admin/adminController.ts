@@ -140,6 +140,7 @@ export async function updateUserStatus(req: Request, res: Response, next: NextFu
       userAgent: req.headers['user-agent'],
     });
 
+    CacheService.invalidateByTag('stats');
     sendSuccess(res, updated, 'User status updated');
   } catch (error) {
     next(error);
@@ -181,6 +182,7 @@ export async function verifyOrganization(req: Request, res: Response, next: Next
         userAgent: req.headers['user-agent'],
       });
 
+      CacheService.invalidateByTag('stats');
       sendSuccess(res, updated, `Hospital verification updated to ${status}`);
     } else if (type === 'blood-bank') {
       const updated = await prisma.bloodBank.update({
@@ -205,6 +207,7 @@ export async function verifyOrganization(req: Request, res: Response, next: Next
         userAgent: req.headers['user-agent'],
       });
 
+      CacheService.invalidateByTag('stats');
       sendSuccess(res, updated, `Blood bank verification updated to ${status}`);
     } else {
       throw new AppError('Invalid organization type', 400);

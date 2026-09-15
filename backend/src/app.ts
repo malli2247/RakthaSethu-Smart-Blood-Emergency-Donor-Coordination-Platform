@@ -22,6 +22,7 @@ import { aiRouter } from './modules/ai/aiRoutes';
 import { uploadRouter } from './modules/uploads/uploadRoutes';
 import { emergencyRouter } from './modules/emergency/emergencyRoutes';
 import { coordinationRouter } from './modules/coordination/coordinationRoutes';
+import { statisticsRouter } from './modules/statistics/statisticsRoutes';
 import { CacheService } from './services/cacheService';
 import { TaskQueueService } from './services/taskQueueService';
 
@@ -120,6 +121,7 @@ export function createApp(): Express {
   app.use('/api/uploads', uploadRouter);
   app.use('/api/emergency', emergencyRouter);
   app.use('/api/coordination', coordinationRouter);
+  app.use('/api/statistics', statisticsRouter);
 
   // 404 Handler
   app.use((req: Request, res: Response, next: NextFunction) => {
