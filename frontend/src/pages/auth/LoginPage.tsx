@@ -42,6 +42,7 @@ export const LoginPage: React.FC = () => {
           case 'VOLUNTEER':
             navigate('/volunteer/dashboard');
             break;
+          case 'SUPER_ADMIN':
           case 'ADMIN':
             navigate('/admin/dashboard');
             break;

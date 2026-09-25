@@ -130,6 +130,7 @@ export const notificationApi = {
 export const adminApi = {
   getStats: () => api.get('/admin/stats'),
   getUsers: (params?: any) => api.get('/admin/users', { params }),
+  getUserById: (id: string) => api.get(`/admin/users/${id}`),
   updateUserStatus: (id: string, data: any) => api.patch(`/admin/users/${id}/status`, data),
   getVerifications: () => api.get('/admin/verifications'),
   verifyOrg: (type: string, id: string, data: any) =>

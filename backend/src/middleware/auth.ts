@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { AppError } from '../utils/response';
@@ -59,7 +59,12 @@ export function requireRole(...roles: string[]) {
       throw new AppError('Authentication required.', 401, 'UNAUTHORIZED');
     }
 
-    if (!roles.includes(req.user.role)) {
+    const effectiveRoles = [...roles];
+    if (effectiveRoles.includes('ADMIN') && !effectiveRoles.includes('SUPER_ADMIN')) {
+      effectiveRoles.push('SUPER_ADMIN');
+    }
+
+    if (!effectiveRoles.includes(req.user.role)) {
       throw new AppError(
         `Access denied. Requires one of the following roles: ${roles.join(', ')}`,
         403,
@@ -77,7 +82,7 @@ export function requireVerified(req: Request, res: Response, next: NextFunction)
   }
 
   // Admins always bypass organization verification check
-  if (req.user.role === 'ADMIN') {
+  if (['ADMIN', 'SUPER_ADMIN'].includes(req.user.role)) {
     return next();
   }
 

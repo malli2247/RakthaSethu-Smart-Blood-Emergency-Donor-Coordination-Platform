@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi } from '../../services/api';
 import { StatCard } from '../../components/StatCard';
@@ -182,6 +182,53 @@ export const AdminDashboard: React.FC = () => {
             Review Verification Queue
           </Link>
         </div>
+      </div>
+
+      {/* Super Admin Control Modules */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Link
+          to="/admin/command-center"
+          className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Activity className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 text-sm">Emergency Command Center</h3>
+          <p className="text-xs text-slate-500 mt-1">Live national triage, active emergency routes, and incident response feeds.</p>
+        </Link>
+
+        <Link
+          to="/admin/simulator"
+          className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 text-sm">Emergency Simulator</h3>
+          <p className="text-xs text-slate-500 mt-1">Simulate mass-casualty triage algorithms and test donor response models.</p>
+        </Link>
+
+        <Link
+          to="/admin/users"
+          className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Users className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 text-sm">User & Role Governance</h3>
+          <p className="text-xs text-slate-500 mt-1">Audit accounts, manage RBAC privileges, inspect profiles, and control suspensions.</p>
+        </Link>
+
+        <Link
+          to="/admin/verifications"
+          className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-slate-300 shadow-2xs hover:shadow-xs transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <h3 className="font-bold text-slate-900 text-sm">Facility Accreditation</h3>
+          <p className="text-xs text-slate-500 mt-1">Review official medical licenses and verify hospital & blood bank centers.</p>
+        </Link>
       </div>
     </div>
   );

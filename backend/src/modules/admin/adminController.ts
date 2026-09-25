@@ -68,10 +68,15 @@ export async function getAdminStats(req: Request, res: Response, next: NextFunct
 
 export async function listAllUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { role, search, page = 1, limit = 25 } = req.query;
+    const { role, status, search, page = 1, limit = 25 } = req.query;
 
     const where: any = {};
     if (role) where.role = String(role);
+    if (status === 'ACTIVE') where.isActive = true;
+    if (status === 'INACTIVE' || status === 'SUSPENDED') where.isActive = false;
+    if (status === 'UNVERIFIED') where.isVerified = false;
+    if (status === 'VERIFIED') where.isVerified = true;
+
     if (search) {
       where.OR = [
         { email: { contains: String(search) } },
@@ -96,9 +101,11 @@ export async function listAllUsers(req: Request, res: Response, next: NextFuncti
           isVerified: true,
           lastLogin: true,
           createdAt: true,
-          donorProfile: { select: { fullName: true, bloodGroup: true, city: true } },
-          hospitalProfile: { select: { name: true, city: true, verificationStatus: true } },
-          bloodBankProfile: { select: { name: true, city: true, verificationStatus: true } },
+          donorProfile: { select: { fullName: true, bloodGroup: true, city: true, isAvailable: true } },
+          patientProfile: { select: { fullName: true, city: true, bloodGroup: true } },
+          hospitalProfile: { select: { name: true, city: true, verificationStatus: true, licenseNumber: true } },
+          bloodBankProfile: { select: { name: true, city: true, verificationStatus: true, licenseNumber: true } },
+          volunteerProfile: { select: { fullName: true, serviceAreaCity: true, skills: true } },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -115,11 +122,45 @@ export async function listAllUsers(req: Request, res: Response, next: NextFuncti
   }
 }
 
+export async function getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        donorProfile: true,
+        patientProfile: true,
+        hospitalProfile: true,
+        bloodBankProfile: true,
+        volunteerProfile: true,
+        auditLogs: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new AppError('User not found', 404, 'NOT_FOUND');
+    }
+
+    const { passwordHash, ...safeUser } = user;
+    sendSuccess(res, safeUser, 'User profile retrieved successfully');
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function updateUserStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { isActive, isVerified } = req.body;
+    const { isActive, isVerified, reason } = req.body;
     const adminId = req.user!.id;
+
+    if (id === adminId && isActive === false) {
+      throw new AppError('Cannot suspend or deactivate your own administrator account', 400);
+    }
 
     const updated = await prisma.user.update({
       where: { id },
@@ -127,21 +168,30 @@ export async function updateUserStatus(req: Request, res: Response, next: NextFu
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
         ...(isVerified !== undefined && { isVerified: Boolean(isVerified) }),
       },
+      select: {
+        id: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        isVerified: true,
+        updatedAt: true,
+      },
     });
 
     // Record audit log
     await recordAuditLog({
       userId: adminId,
-      action: 'UPDATE_USER_STATUS',
+      action: isActive === false ? 'SUSPEND_USER' : (isActive === true ? 'ACTIVATE_USER' : 'UPDATE_USER_STATUS'),
       entity: 'User',
       entityId: id,
-      details: { isActive, isVerified },
+      details: { isActive, isVerified, reason },
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
     });
 
     CacheService.invalidateByTag('stats');
-    sendSuccess(res, updated, 'User status updated');
+    sendSuccess(res, updated, 'User status updated successfully');
   } catch (error) {
     next(error);
   }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getAdminStats,
   listAllUsers,
+  getUserById,
   updateUserStatus,
   verifyOrganization,
   getVerificationRequests,
@@ -16,6 +17,7 @@ adminRouter.use(requireRole('ADMIN'));
 
 adminRouter.get('/stats', getAdminStats);
 adminRouter.get('/users', listAllUsers);
+adminRouter.get('/users/:id', getUserById);
 adminRouter.patch('/users/:id/status', updateUserStatus);
 adminRouter.get('/verifications', getVerificationRequests);
 adminRouter.patch('/verifications/:type/:id', verifyOrganization);

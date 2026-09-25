@@ -1,11 +1,12 @@
-﻿export const Role = {
+export const Role = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  ADMIN: 'ADMIN',
   DONOR: 'DONOR',
   PATIENT: 'PATIENT',
   ATTENDANT: 'ATTENDANT',
   HOSPITAL: 'HOSPITAL',
   BLOOD_BANK: 'BLOOD_BANK',
   VOLUNTEER: 'VOLUNTEER',
-  ADMIN: 'ADMIN',
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 

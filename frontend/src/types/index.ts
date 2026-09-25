@@ -1,11 +1,12 @@
-﻿export type Role =
+export type Role =
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
   | 'DONOR'
   | 'PATIENT'
   | 'ATTENDANT'
   | 'HOSPITAL'
   | 'BLOOD_BANK'
-  | 'VOLUNTEER'
-  | 'ADMIN';
+  | 'VOLUNTEER';
 
 export type BloodGroup =
   | 'A_POSITIVE'

@@ -78,6 +78,7 @@ export const DashboardLayout: React.FC = () => {
         return [
           { label: 'Volunteer Hub', path: '/volunteer/dashboard', icon: LayoutDashboard },
         ];
+      case 'SUPER_ADMIN':
       case 'ADMIN':
         return [
           { label: 'Admin Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },

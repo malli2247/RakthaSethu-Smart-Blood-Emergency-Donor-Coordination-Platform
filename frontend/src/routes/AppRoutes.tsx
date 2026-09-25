@@ -54,6 +54,17 @@ import { CopilotPage } from '../pages/bloodbank/CopilotPage';
 import { ProgressiveSearchScreen } from '../pages/emergency/ProgressiveSearchScreen';
 import { CoordinationRoomPage } from '../pages/coordination/CoordinationRoomPage';
 
+const roleDashboards: Record<string, string> = {
+  DONOR: '/donor/dashboard',
+  PATIENT: '/patient/dashboard',
+  ATTENDANT: '/patient/dashboard',
+  HOSPITAL: '/hospital/dashboard',
+  BLOOD_BANK: '/bloodbank/dashboard',
+  VOLUNTEER: '/volunteer/dashboard',
+  ADMIN: '/admin/dashboard',
+  SUPER_ADMIN: '/admin/dashboard',
+};
+
 const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: string[] }> = ({
   children,
   allowedRoles,
@@ -61,15 +72,29 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement; allowedRoles?: st
   const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-900 text-white font-medium">
+        <div className="flex items-center gap-3">
+          <div className="w-5 h-5 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+          <span>Verifying role authorization...</span>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/" replace />;
+  if (allowedRoles) {
+    const effectiveAllowed = allowedRoles.includes('ADMIN')
+      ? [...allowedRoles, 'SUPER_ADMIN']
+      : allowedRoles;
+
+    if (!effectiveAllowed.includes(user.role)) {
+      const userDashboard = roleDashboards[user.role] || '/';
+      return <Navigate to={userDashboard} replace />;
+    }
   }
 
   return children;
@@ -96,7 +121,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/coordination/:id" element={<CoordinationRoomPage />} />
       </Route>
 
-      {/* Protected Dashboard Routes */}
+      {/* Protected Dashboard Routes with Strict RBAC Isolation */}
       <Route
         element={
           <ProtectedRoute>
@@ -104,34 +129,34 @@ export const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       >
-        {/* Donor */}
-        <Route path="/donor/dashboard" element={<DonorDashboard />} />
-        <Route path="/donor/requests" element={<DonorRequestsPage />} />
-        <Route path="/donor/history" element={<DonorHistoryPage />} />
-        <Route path="/donor/profile" element={<DonorProfilePage />} />
+        {/* Donor Workflow */}
+        <Route path="/donor/dashboard" element={<ProtectedRoute allowedRoles={['DONOR']}><DonorDashboard /></ProtectedRoute>} />
+        <Route path="/donor/requests" element={<ProtectedRoute allowedRoles={['DONOR']}><DonorRequestsPage /></ProtectedRoute>} />
+        <Route path="/donor/history" element={<ProtectedRoute allowedRoles={['DONOR']}><DonorHistoryPage /></ProtectedRoute>} />
+        <Route path="/donor/profile" element={<ProtectedRoute allowedRoles={['DONOR']}><DonorProfilePage /></ProtectedRoute>} />
 
-        {/* Patient */}
-        <Route path="/patient/dashboard" element={<PatientDashboard />} />
+        {/* Receiver / Patient Workflow */}
+        <Route path="/patient/dashboard" element={<ProtectedRoute allowedRoles={['PATIENT', 'ATTENDANT']}><PatientDashboard /></ProtectedRoute>} />
 
-        {/* Hospital */}
-        <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
-        <Route path="/hospital/requests" element={<ManageRequestsPage />} />
-        <Route path="/hospital/confirm-donation" element={<ManageRequestsPage />} />
+        {/* Hospital Workflow */}
+        <Route path="/hospital/dashboard" element={<ProtectedRoute allowedRoles={['HOSPITAL']}><HospitalDashboard /></ProtectedRoute>} />
+        <Route path="/hospital/requests" element={<ProtectedRoute allowedRoles={['HOSPITAL']}><ManageRequestsPage /></ProtectedRoute>} />
+        <Route path="/hospital/confirm-donation" element={<ProtectedRoute allowedRoles={['HOSPITAL']}><ManageRequestsPage /></ProtectedRoute>} />
 
-        {/* Blood Bank */}
-        <Route path="/bloodbank/dashboard" element={<BloodBankDashboard />} />
-        <Route path="/bloodbank/inventory" element={<InventoryPage />} />
-        <Route path="/bloodbank/copilot" element={<CopilotPage />} />
+        {/* Blood Bank Workflow */}
+        <Route path="/bloodbank/dashboard" element={<ProtectedRoute allowedRoles={['BLOOD_BANK']}><BloodBankDashboard /></ProtectedRoute>} />
+        <Route path="/bloodbank/inventory" element={<ProtectedRoute allowedRoles={['BLOOD_BANK']}><InventoryPage /></ProtectedRoute>} />
+        <Route path="/bloodbank/copilot" element={<ProtectedRoute allowedRoles={['BLOOD_BANK']}><CopilotPage /></ProtectedRoute>} />
 
-        {/* Volunteer */}
-        <Route path="/volunteer/dashboard" element={<VolunteerDashboard />} />
+        {/* Volunteer Workflow */}
+        <Route path="/volunteer/dashboard" element={<ProtectedRoute allowedRoles={['VOLUNTEER']}><VolunteerDashboard /></ProtectedRoute>} />
 
-        {/* Admin */}
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        <Route path="/admin/command-center" element={<CommandCenterPage />} />
-        <Route path="/admin/simulator" element={<EmergencySimulatorPage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
-        <Route path="/admin/verifications" element={<AdminVerificationsPage />} />
+        {/* Super Admin & Admin Workflow */}
+        <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/command-center" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><CommandCenterPage /></ProtectedRoute>} />
+        <Route path="/admin/simulator" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><EmergencySimulatorPage /></ProtectedRoute>} />
+        <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
+        <Route path="/admin/verifications" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminVerificationsPage /></ProtectedRoute>} />
       </Route>
 
       {/* Fallback */}
