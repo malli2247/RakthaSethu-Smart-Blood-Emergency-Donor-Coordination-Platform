@@ -54,10 +54,38 @@ if (process.env.NODE_ENV !== 'production') {
   global.prismaInstance = prisma;
 }
 
+async function ensureAdminUser(): Promise<void> {
+  try {
+    const adminCount = await prisma.user.count({
+      where: { role: 'ADMIN' },
+    });
+    if (adminCount === 0) {
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.default.hash('Admin@123456', 10);
+      await prisma.user.upsert({
+        where: { email: 'admin@rakthasethu.org' },
+        update: {},
+        create: {
+          email: 'admin@rakthasethu.org',
+          passwordHash,
+          phone: '+919999900001',
+          role: 'ADMIN',
+          isVerified: true,
+          isActive: true,
+        },
+      });
+      logger.info('👑 Default Admin account initialized: admin@rakthasethu.org (Password: Admin@123456)');
+    }
+  } catch (err) {
+    logger.warn(`⚠️ Note on admin initialization: ${(err as Error).message}`);
+  }
+}
+
 export async function connectDatabase(): Promise<boolean> {
   try {
     await prisma.$connect();
     logger.info('✅ Database connection established with optimized pool.');
+    await ensureAdminUser();
     return true;
   } catch (error) {
     logger.error(`⚠️ Database connection warning: ${(error as Error).message}`);
