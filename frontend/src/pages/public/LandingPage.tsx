@@ -47,7 +47,7 @@ export const LandingPage: React.FC = () => {
 
   // 2. Fetch live activity feed
   const {
-    data: activityData,
+    data: rawActivityData,
     isLoading: isActivityLoading,
   } = useQuery({
     queryKey: ['public_activity'],
@@ -58,10 +58,11 @@ export const LandingPage: React.FC = () => {
     staleTime: 15000,
     refetchInterval: 30000,
   });
+  const activityData = Array.isArray(rawActivityData) ? rawActivityData : [];
 
   // 3. Fetch live blood inventory
   const {
-    data: inventoryData,
+    data: rawInventoryData,
     isLoading: isInventoryLoading,
   } = useQuery({
     queryKey: ['public_inventory'],
@@ -72,6 +73,7 @@ export const LandingPage: React.FC = () => {
     staleTime: 30000,
     refetchInterval: 60000,
   });
+  const inventoryData = Array.isArray(rawInventoryData) ? rawInventoryData : [];
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();

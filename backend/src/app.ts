@@ -52,12 +52,45 @@ export function createApp(): Express {
     })
   );
 
+  const allowedOrigins = [
+    config.frontendUrl,
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:4173',
+  ].filter(Boolean);
+
   app.use(
     cors({
-      origin: [config.frontendUrl, 'http://localhost:5173', 'http://localhost:3000'],
+      origin: (origin, callback) => {
+        // Allow server-to-server, curl, mobile, or missing origin
+        if (!origin) return callback(null, true);
+
+        // Allow if in explicit allowedOrigins
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+
+        // Allow any Vercel domain (*.vercel.app)
+        if (/^https:\/\/([a-zA-Z0-9_-]+\.)*vercel\.app$/.test(origin)) {
+          return callback(null, true);
+        }
+
+        // Allow any onrender domain
+        if (/^https:\/\/([a-zA-Z0-9_-]+\.)*onrender\.com$/.test(origin)) {
+          return callback(null, true);
+        }
+
+        // Allow local network IP or localhost
+        if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+          return callback(null, true);
+        }
+
+        // Fallback allow for public web access
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
     })
   );
 
