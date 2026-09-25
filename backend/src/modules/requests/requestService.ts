@@ -164,7 +164,7 @@ export class RequestService {
     const isHospitalStaff = viewerRole === 'HOSPITAL';
 
     // Mask donor contacts on matches according to Phase 10 privacy rules
-    const sanitizedMatches = request.matches.map((match) => {
+    const sanitizedMatches = request.matches.map((match: any) => {
       const isMatchDonor = Boolean(viewerId && match.donor.userId === viewerId);
       const isMatchAccepted = match.status === 'ACCEPTED';
       const canViewFullDetails =

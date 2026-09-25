@@ -30,10 +30,10 @@ if (!fs.existsSync(uploadDirectory)) {
 
 // Multer disk storage engine generating unguessable UUID filenames
 const diskStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
+  destination: (_req: any, _file: any, cb: any) => {
     cb(null, uploadDirectory);
   },
-  filename: (_req, file, cb) => {
+  filename: (_req: any, file: any, cb: any) => {
     const extension = MIME_EXTENSION_MAP[file.mimetype] || path.extname(file.originalname).toLowerCase();
     const safeExtension = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'].includes(extension) ? extension : '.bin';
     const uniqueId = crypto.randomUUID();
@@ -44,8 +44,8 @@ const diskStorage = multer.diskStorage({
 // File filter checking MIME types
 const fileFilter = (
   _req: Request,
-  file: Express.Multer.File,
-  cb: multer.FileFilterCallback
+  file: any,
+  cb: any
 ) => {
   if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
     cb(null, true);

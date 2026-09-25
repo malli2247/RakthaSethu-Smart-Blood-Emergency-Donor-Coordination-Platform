@@ -46,7 +46,7 @@ if (config.scaling?.clusterMode && cluster.isPrimary) {
     cluster.fork();
   }
 
-  cluster.on('exit', (worker, code, signal) => {
+  cluster.on('exit', (worker: any, code: any, signal: any) => {
     logger.warn(`⚠️ Worker process ${worker.process.pid} exited (code: ${code}, signal: ${signal}). Auto-restarting...`);
     cluster.fork();
   });

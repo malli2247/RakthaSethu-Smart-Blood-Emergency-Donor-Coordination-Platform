@@ -216,7 +216,7 @@ export async function getRecentActivity(req: Request, res: Response, next: NextF
         const feed: ActivityItem[] = [];
 
         // Map requests
-        recentRequests.forEach((req) => {
+        recentRequests.forEach((req: any) => {
           if (req.status === 'FULFILLED') {
             feed.push({
               id: `req-ful-${req.id}`,
@@ -242,7 +242,7 @@ export async function getRecentActivity(req: Request, res: Response, next: NextF
         });
 
         // Map donations
-        recentDonations.forEach((don) => {
+        recentDonations.forEach((don: any) => {
           const city = don.hospital?.city || don.bloodBank?.city || 'Emergency Network';
           feed.push({
             id: `don-${don.id}`,
@@ -256,7 +256,7 @@ export async function getRecentActivity(req: Request, res: Response, next: NextF
         });
 
         // Map facility verification
-        recentFacilities.forEach((hosp) => {
+        recentFacilities.forEach((hosp: any) => {
           feed.push({
             id: `hosp-${hosp.id}`,
             type: 'HOSPITAL_JOINED',
@@ -307,7 +307,7 @@ export async function getLiveInventory(req: Request, res: Response, next: NextFu
         });
 
         const stockMap = new Map<string, number>();
-        items.forEach((item) => {
+        items.forEach((item: any) => {
           stockMap.set(item.bloodGroup, item._sum.units || 0);
         });
 
@@ -379,17 +379,17 @@ export async function getAdminAnalytics(req: Request, res: Response, next: NextF
         ]);
 
         const roleCounts: Record<string, number> = {};
-        usersByRole.forEach((r) => {
+        usersByRole.forEach((r: any) => {
           roleCounts[r.role] = r._count.id;
         });
 
         const bgCounts: Record<string, number> = {};
-        requestsByBloodGroup.forEach((b) => {
+        requestsByBloodGroup.forEach((b: any) => {
           bgCounts[b.bloodGroup] = b._count.id;
         });
 
         const urgencyCounts: Record<string, number> = {};
-        requestsByUrgency.forEach((u) => {
+        requestsByUrgency.forEach((u: any) => {
           urgencyCounts[u.urgency] = u._count.id;
         });
 

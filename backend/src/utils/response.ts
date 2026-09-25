@@ -1,4 +1,4 @@
-﻿import { Response } from 'express';
+import { Response } from 'express';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -22,7 +22,7 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
-    Error.captureStackTrace(this, this.constructor);
+    (Error as any).captureStackTrace?.(this, this.constructor);
   }
 }
 
