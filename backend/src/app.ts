@@ -112,6 +112,17 @@ export function createApp(): Express {
     express.static(config.storage.uploadDir)
   );
 
+  // Root welcome endpoint for status checkers and browsers
+  app.get('/', (req: Request, res: Response) => {
+    sendSuccess(res, {
+      status: 'online',
+      service: 'RakthaSethu Smart Blood Emergency Coordination API',
+      version: '1.0.0',
+      health: '/api/health',
+      environment: config.nodeEnv,
+    });
+  });
+
   // Health check endpoint
   app.get('/api/health', (req: Request, res: Response) => {
     sendSuccess(res, {
