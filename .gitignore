@@ -25,6 +25,10 @@ build/
 *.db
 *.db-journal
 
-# Uploads
-uploads/
-storage/
+# Uploads (user uploaded media, not code modules)
+/uploads/
+/storage/
+backend/uploads/
+backend/storage/
+!backend/src/modules/uploads/
+!backend/src/modules/uploads/**
