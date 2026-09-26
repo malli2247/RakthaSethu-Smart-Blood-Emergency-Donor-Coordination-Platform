@@ -153,129 +153,391 @@ export async function getPublicStatistics(req: Request, res: Response, next: Nex
  */
 export async function getRecentActivity(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    const user = req.user!;
+    const cacheKey = `activity_${user.role}_${user.id}`;
+
     const activity = await CacheService.wrap(
-      'recent_activity',
-      15, // 15-second TTL
+      cacheKey,
+      10, // 10-second TTL
       async () => {
-        const [recentRequests, recentDonations, recentFacilities] = await Promise.all([
-          // Recent emergency requests
-          prisma.bloodRequest.findMany({
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            select: {
-              id: true,
-              bloodGroup: true,
-              unitsRequired: true,
-              hospitalCity: true,
-              urgency: true,
-              status: true,
-              createdAt: true,
-            },
-          }),
-
-          // Recent confirmed donations
-          prisma.donation.findMany({
-            take: 5,
-            orderBy: { donationDate: 'desc' },
-            select: {
-              id: true,
-              bloodGroup: true,
-              units: true,
-              donationDate: true,
-              hospital: {
-                select: { city: true },
-              },
-              bloodBank: {
-                select: { city: true },
-              },
-            },
-          }),
-
-          // Recent verified facilities
-          prisma.hospital.findMany({
-            where: { verificationStatus: 'VERIFIED' },
-            take: 3,
-            orderBy: { updatedAt: 'desc' },
-            select: {
-              id: true,
-              name: true,
-              city: true,
-              updatedAt: true,
-            },
-          }),
-        ]);
-
         type ActivityItem = {
           id: string;
-          type: 'REQUEST' | 'DONATION' | 'HOSPITAL_JOINED' | 'FULFILLED';
+          type: 'REQUEST' | 'DONATION' | 'HOSPITAL_JOINED' | 'FULFILLED' | 'MATCH';
           title: string;
           description: string;
           timestamp: string;
           city?: string;
           bloodGroup?: string;
           urgency?: string;
+          status?: string;
         };
 
         const feed: ActivityItem[] = [];
 
-        // Map requests
-        recentRequests.forEach((req: any) => {
-          if (req.status === 'FULFILLED') {
+        // 1. ADMIN & SUPER_ADMIN: Global operational emergency feed
+        if (['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
+          const [recentRequests, recentDonations, recentFacilities] = await Promise.all([
+            prisma.bloodRequest.findMany({
+              take: 8,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                bloodGroup: true,
+                unitsRequired: true,
+                hospitalCity: true,
+                urgency: true,
+                status: true,
+                createdAt: true,
+              },
+            }),
+            prisma.donation.findMany({
+              where: { status: 'CONFIRMED' },
+              take: 5,
+              orderBy: { donationDate: 'desc' },
+              select: {
+                id: true,
+                bloodGroup: true,
+                units: true,
+                donationDate: true,
+                hospital: { select: { city: true } },
+                bloodBank: { select: { city: true } },
+              },
+            }),
+            prisma.hospital.findMany({
+              where: { verificationStatus: 'VERIFIED' },
+              take: 3,
+              orderBy: { updatedAt: 'desc' },
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                updatedAt: true,
+              },
+            }),
+          ]);
+
+          recentRequests.forEach((r: any) => {
+            if (r.status === 'FULFILLED') {
+              feed.push({
+                id: `req-ful-${r.id}`,
+                type: 'FULFILLED',
+                title: 'Emergency Blood Request Fulfilled',
+                description: `${r.unitsRequired} unit(s) of ${r.bloodGroup} provided successfully in ${r.hospitalCity}.`,
+                timestamp: r.createdAt.toISOString(),
+                city: r.hospitalCity,
+                bloodGroup: r.bloodGroup,
+                status: r.status,
+              });
+            } else {
+              feed.push({
+                id: `req-${r.id}`,
+                type: 'REQUEST',
+                title: `Emergency Blood Alert: ${r.bloodGroup}`,
+                description: `${r.unitsRequired} unit(s) needed in ${r.hospitalCity} (${r.urgency}).`,
+                timestamp: r.createdAt.toISOString(),
+                city: r.hospitalCity,
+                bloodGroup: r.bloodGroup,
+                urgency: r.urgency,
+                status: r.status,
+              });
+            }
+          });
+
+          recentDonations.forEach((d: any) => {
+            const city = d.hospital?.city || d.bloodBank?.city || 'Medical Center';
             feed.push({
-              id: `req-ful-${req.id}`,
-              type: 'FULFILLED',
-              title: `Emergency Blood Request Fulfilled`,
-              description: `${req.unitsRequired} unit(s) of ${req.bloodGroup} provided successfully in ${req.hospitalCity}.`,
-              timestamp: req.createdAt.toISOString(),
-              city: req.hospitalCity,
-              bloodGroup: req.bloodGroup,
+              id: `don-${d.id}`,
+              type: 'DONATION',
+              title: 'Successful Blood Donation Confirmed',
+              description: `${d.units} unit(s) of ${d.bloodGroup} donated at verified center in ${city}.`,
+              timestamp: d.donationDate.toISOString(),
+              city,
+              bloodGroup: d.bloodGroup,
             });
-          } else {
+          });
+
+          recentFacilities.forEach((h: any) => {
             feed.push({
-              id: `req-${req.id}`,
-              type: 'REQUEST',
-              title: `Emergency Blood Alert: ${req.bloodGroup}`,
-              description: `${req.unitsRequired} unit(s) needed in ${req.hospitalCity} (${req.urgency}).`,
-              timestamp: req.createdAt.toISOString(),
-              city: req.hospitalCity,
-              bloodGroup: req.bloodGroup,
-              urgency: req.urgency,
+              id: `hosp-${h.id}`,
+              type: 'HOSPITAL_JOINED',
+              title: 'Medical Center Verified',
+              description: `${h.name} in ${h.city} verified and connected to emergency lifeline.`,
+              timestamp: h.updatedAt.toISOString(),
+              city: h.city,
+            });
+          });
+        }
+        // 2. DONOR: Only emergency requests matched to this donor & donor's personal confirmed donations
+        else if (user.role === 'DONOR') {
+          const donorProfile = await prisma.donorProfile.findUnique({
+            where: { userId: user.id },
+            select: { id: true },
+          });
+
+          if (donorProfile) {
+            const [matches, donations] = await Promise.all([
+              prisma.donorMatch.findMany({
+                where: { donorId: donorProfile.id },
+                take: 8,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                  request: {
+                    select: {
+                      id: true,
+                      bloodGroup: true,
+                      unitsRequired: true,
+                      hospitalName: true,
+                      hospitalCity: true,
+                      urgency: true,
+                      status: true,
+                    },
+                  },
+                },
+              }),
+              prisma.donation.findMany({
+                where: { donorId: donorProfile.id, status: 'CONFIRMED' },
+                take: 5,
+                orderBy: { donationDate: 'desc' },
+                select: {
+                  id: true,
+                  bloodGroup: true,
+                  units: true,
+                  donationDate: true,
+                  hospital: { select: { name: true, city: true } },
+                },
+              }),
+            ]);
+
+            matches.forEach((m: any) => {
+              feed.push({
+                id: `match-${m.id}`,
+                type: 'MATCH',
+                title: `Emergency Blood Match: ${m.request.bloodGroup}`,
+                description: `You are eligible and matched for ${m.request.unitsRequired} unit(s) at ${m.request.hospitalName}, ${m.request.hospitalCity}. Status: ${m.status}.`,
+                timestamp: m.createdAt.toISOString(),
+                city: m.request.hospitalCity,
+                bloodGroup: m.request.bloodGroup,
+                urgency: m.request.urgency,
+                status: m.status,
+              });
+            });
+
+            donations.forEach((d: any) => {
+              feed.push({
+                id: `don-${d.id}`,
+                type: 'DONATION',
+                title: 'Donation Completed & Confirmed',
+                description: `Successfully donated ${d.units} unit(s) of ${d.bloodGroup} at ${d.hospital?.name || 'Authorized Center'}.`,
+                timestamp: d.donationDate.toISOString(),
+                bloodGroup: d.bloodGroup,
+              });
             });
           }
-        });
-
-        // Map donations
-        recentDonations.forEach((don: any) => {
-          const city = don.hospital?.city || don.bloodBank?.city || 'Emergency Network';
-          feed.push({
-            id: `don-${don.id}`,
-            type: 'DONATION',
-            title: `Successful Blood Donation Confirmed`,
-            description: `${don.units} unit(s) of ${don.bloodGroup} donated at verified center in ${city}.`,
-            timestamp: don.donationDate.toISOString(),
-            city,
-            bloodGroup: don.bloodGroup,
+        }
+        // 3. PATIENT / RECEIVER: Only their own blood requests
+        else if (['PATIENT', 'RECEIVER'].includes(user.role)) {
+          const requests = await prisma.bloodRequest.findMany({
+            where: { requesterId: user.id },
+            take: 10,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              bloodGroup: true,
+              unitsRequired: true,
+              unitsFulfilled: true,
+              hospitalCity: true,
+              urgency: true,
+              status: true,
+              createdAt: true,
+            },
           });
-        });
 
-        // Map facility verification
-        recentFacilities.forEach((hosp: any) => {
-          feed.push({
-            id: `hosp-${hosp.id}`,
-            type: 'HOSPITAL_JOINED',
-            title: `Medical Center Verified`,
-            description: `${hosp.name} in ${hosp.city} verified and connected to emergency lifeline.`,
-            timestamp: hosp.updatedAt.toISOString(),
-            city: hosp.city,
+          requests.forEach((r: any) => {
+            feed.push({
+              id: `patient-req-${r.id}`,
+              type: r.status === 'FULFILLED' ? 'FULFILLED' : 'REQUEST',
+              title: `Your Blood Request: ${r.bloodGroup} (${r.status})`,
+              description: `${r.unitsRequired} unit(s) requested for ${r.hospitalCity}. Fulfilled: ${r.unitsFulfilled}/${r.unitsRequired}.`,
+              timestamp: r.createdAt.toISOString(),
+              city: r.hospitalCity,
+              bloodGroup: r.bloodGroup,
+              status: r.status,
+            });
           });
-        });
+        }
+        // 4. HOSPITAL: Only authorized hospital requests & donations
+        else if (user.role === 'HOSPITAL') {
+          const hospital = await prisma.hospital.findUnique({
+            where: { userId: user.id },
+            select: { id: true, name: true, city: true },
+          });
 
-        // Sort descending by timestamp and limit to 8
-        feed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+          if (hospital) {
+            const [requests, donations] = await Promise.all([
+              prisma.bloodRequest.findMany({
+                where: {
+                  OR: [
+                    { requesterId: user.id },
+                    { hospitalName: hospital.name },
+                  ],
+                },
+                take: 10,
+                orderBy: { createdAt: 'desc' },
+                select: {
+                  id: true,
+                  bloodGroup: true,
+                  unitsRequired: true,
+                  unitsFulfilled: true,
+                  urgency: true,
+                  status: true,
+                  createdAt: true,
+                },
+              }),
+              prisma.donation.findMany({
+                where: { hospitalId: hospital.id },
+                take: 5,
+                orderBy: { donationDate: 'desc' },
+                select: {
+                  id: true,
+                  bloodGroup: true,
+                  units: true,
+                  status: true,
+                  donationDate: true,
+                },
+              }),
+            ]);
 
-        return feed.slice(0, 8);
+            requests.forEach((r: any) => {
+              feed.push({
+                id: `hosp-req-${r.id}`,
+                type: r.status === 'FULFILLED' ? 'FULFILLED' : 'REQUEST',
+                title: `Hospital Emergency Request: ${r.bloodGroup}`,
+                description: `${r.unitsRequired} unit(s) needed (${r.urgency}). Status: ${r.status}.`,
+                timestamp: r.createdAt.toISOString(),
+                bloodGroup: r.bloodGroup,
+                status: r.status,
+              });
+            });
+
+            donations.forEach((d: any) => {
+              feed.push({
+                id: `hosp-don-${d.id}`,
+                type: 'DONATION',
+                title: `Donation Session: ${d.bloodGroup}`,
+                description: `${d.units} unit(s) logged at your hospital. Status: ${d.status}.`,
+                timestamp: d.donationDate.toISOString(),
+                bloodGroup: d.bloodGroup,
+                status: d.status,
+              });
+            });
+          }
+        }
+        // 5. BLOOD BANK: Only authorized inventory & donations
+        else if (user.role === 'BLOOD_BANK') {
+          const bloodBank = await prisma.bloodBank.findUnique({
+            where: { userId: user.id },
+            select: { id: true, name: true },
+          });
+
+          if (bloodBank) {
+            const [donations, inventoryBatches] = await Promise.all([
+              prisma.donation.findMany({
+                where: { bloodBankId: bloodBank.id },
+                take: 5,
+                orderBy: { donationDate: 'desc' },
+                select: {
+                  id: true,
+                  bloodGroup: true,
+                  units: true,
+                  status: true,
+                  donationDate: true,
+                },
+              }),
+              prisma.bloodInventory.findMany({
+                where: { bloodBankId: bloodBank.id },
+                take: 5,
+                orderBy: { updatedAt: 'desc' },
+                select: {
+                  id: true,
+                  bloodGroup: true,
+                  units: true,
+                  status: true,
+                  updatedAt: true,
+                },
+              }),
+            ]);
+
+            donations.forEach((d: any) => {
+              feed.push({
+                id: `bb-don-${d.id}`,
+                type: 'DONATION',
+                title: `Blood Center Intake: ${d.bloodGroup}`,
+                description: `${d.units} unit(s) collected at facility. Status: ${d.status}.`,
+                timestamp: d.donationDate.toISOString(),
+                bloodGroup: d.bloodGroup,
+              });
+            });
+
+            inventoryBatches.forEach((b: any) => {
+              feed.push({
+                id: `bb-inv-${b.id}`,
+                type: 'FULFILLED',
+                title: `Inventory Stock: ${b.bloodGroup}`,
+                description: `${b.units} unit(s) updated in cold storage. Status: ${b.status}.`,
+                timestamp: b.updatedAt.toISOString(),
+                bloodGroup: b.bloodGroup,
+              });
+            });
+          }
+        }
+        // 6. VOLUNTEER: Only assigned / local service area tasks
+        else if (user.role === 'VOLUNTEER') {
+          const volunteer = await prisma.volunteer.findUnique({
+            where: { userId: user.id },
+            select: { serviceAreaCity: true },
+          });
+
+          if (volunteer?.serviceAreaCity) {
+            const localRequests = await prisma.bloodRequest.findMany({
+              where: {
+                hospitalCity: volunteer.serviceAreaCity,
+                status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED'] },
+              },
+              take: 5,
+              orderBy: { createdAt: 'desc' },
+              select: {
+                id: true,
+                bloodGroup: true,
+                unitsRequired: true,
+                hospitalName: true,
+                hospitalCity: true,
+                urgency: true,
+                status: true,
+                createdAt: true,
+              },
+            });
+
+            localRequests.forEach((r: any) => {
+              feed.push({
+                id: `vol-req-${r.id}`,
+                type: 'REQUEST',
+                title: `Local Task Alert: ${r.bloodGroup}`,
+                description: `Emergency coordination in ${r.hospitalCity} at ${r.hospitalName} (${r.urgency}).`,
+                timestamp: r.createdAt.toISOString(),
+                city: r.hospitalCity,
+                bloodGroup: r.bloodGroup,
+                urgency: r.urgency,
+                status: r.status,
+              });
+            });
+          }
+        }
+
+        // Sort descending by timestamp
+        feed.sort((a: ActivityItem, b: ActivityItem) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        return feed.slice(0, 10);
       },
-      ['stats']
+      ['stats', `user_${user.id}`]
     );
 
     sendSuccess(res, activity);

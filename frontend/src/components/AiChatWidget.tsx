@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles, AlertCircle, MessageSquare } from 'lucide-react';
 import { aiApi } from '../services/api';
 
@@ -38,6 +38,17 @@ export const AiChatWidget: React.FC = () => {
       scrollToBottom();
     }
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    const handleOpenChat = (e: any) => {
+      setIsOpen(true);
+      if (e.detail?.prompt) {
+        handleSend(e.detail.prompt);
+      }
+    };
+    window.addEventListener('open-ai-chat', handleOpenChat);
+    return () => window.removeEventListener('open-ai-chat', handleOpenChat);
+  }, []);
 
   const handleSend = async (queryText?: string) => {
     const textToSend = queryText || input.trim();

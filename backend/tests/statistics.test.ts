@@ -3,6 +3,8 @@ import request from 'supertest';
 import { createApp } from '../src/app';
 import { prisma } from '../src/config/database';
 import { CacheService } from '../src/services/cacheService';
+import jwt from 'jsonwebtoken';
+import { config } from '../src/config';
 
 const app = createApp();
 
@@ -219,20 +221,38 @@ describe('Statistics Module - 100% Database-Driven & Zero-Baseline Verification'
     await prisma.user.delete({ where: { id: requester.id } });
   });
 
-  it('GET /api/statistics/activity returns valid database activity feed', async () => {
+  it('GET /api/statistics/activity rejects unauthenticated guests with 401', async () => {
     const res = await request(app).get('/api/statistics/activity');
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('GET /api/statistics/activity returns operational activity feed for authenticated Admin', async () => {
+    const adminToken = jwt.sign(
+      { id: 'admin-test-id', email: 'admin@rakthasethu.org', role: 'ADMIN', isVerified: true },
+      config.jwt.accessSecret,
+      { expiresIn: '1h' }
+    );
+    const res = await request(app)
+      .get('/api/statistics/activity')
+      .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
+  });
 
-    if (res.body.data.length > 0) {
-      const item = res.body.data[0];
-      expect(item).toHaveProperty('id');
-      expect(item).toHaveProperty('type');
-      expect(item).toHaveProperty('title');
-      expect(item).toHaveProperty('description');
-      expect(item).toHaveProperty('timestamp');
-    }
+  it('GET /api/statistics/activity returns role-scoped feed for authenticated Donor', async () => {
+    const donorToken = jwt.sign(
+      { id: 'donor-test-id', email: 'donor@rakthasethu.org', role: 'DONOR', isVerified: true },
+      config.jwt.accessSecret,
+      { expiresIn: '1h' }
+    );
+    const res = await request(app)
+      .get('/api/statistics/activity')
+      .set('Authorization', `Bearer ${donorToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
   });
 
   it('GET /api/statistics/inventory returns all 8 ABO/Rh blood groups with real stock counts', async () => {

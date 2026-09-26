@@ -18,16 +18,65 @@ import {
   RefreshCw,
   Sparkles,
   Award,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  HelpCircle,
+  Bot,
+  Check,
 } from 'lucide-react';
 import { statisticsApi } from '../../services/api';
 import { AnimatedCounter } from '../../components/common/AnimatedCounter';
 import { ParticleBackground } from '../../components/common/ParticleBackground';
-import { TruthfulEmptyState } from '../../components/common/TruthfulEmptyState';
+
+const BLOOD_GROUPS_MATRIX = [
+  'O_NEGATIVE',
+  'O_POSITIVE',
+  'A_NEGATIVE',
+  'A_POSITIVE',
+  'B_NEGATIVE',
+  'B_POSITIVE',
+  'AB_NEGATIVE',
+  'AB_POSITIVE',
+];
+
+const BG_SHORT: Record<string, string> = {
+  O_NEGATIVE: 'O-',
+  O_POSITIVE: 'O+',
+  A_NEGATIVE: 'A-',
+  A_POSITIVE: 'A+',
+  B_NEGATIVE: 'B-',
+  B_POSITIVE: 'B+',
+  AB_NEGATIVE: 'AB-',
+  AB_POSITIVE: 'AB+',
+};
+
+function canDonate(donor: string, recipient: string): boolean {
+  if (donor === 'O_NEGATIVE') return true;
+  if (recipient === 'AB_POSITIVE') return true;
+  if (donor === 'O_POSITIVE') return ['O_POSITIVE', 'A_POSITIVE', 'B_POSITIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'A_NEGATIVE') return ['A_NEGATIVE', 'A_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'A_POSITIVE') return ['A_POSITIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'B_NEGATIVE') return ['B_NEGATIVE', 'B_POSITIVE', 'AB_NEGATIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'B_POSITIVE') return ['B_POSITIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'AB_NEGATIVE') return ['AB_NEGATIVE', 'AB_POSITIVE'].includes(recipient);
+  if (donor === 'AB_POSITIVE') return recipient === 'AB_POSITIVE';
+  return false;
+}
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
   const [selectedBloodGroup, setSelectedBloodGroup] = useState('B_POSITIVE');
   const [searchCity, setSearchCity] = useState('');
+  const [compatSelected, setCompatSelected] = useState('O_NEGATIVE');
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+  const canDonateTo = BLOOD_GROUPS_MATRIX.filter((g) => canDonate(compatSelected, g));
+  const canReceiveFrom = BLOOD_GROUPS_MATRIX.filter((g) => canDonate(g, compatSelected));
+
+  const handleOpenAi = (prompt?: string) => {
+    window.dispatchEvent(new CustomEvent('open-ai-chat', { detail: { prompt } }));
+  };
 
   // 1. Fetch 100% database-driven public statistics
   const {
@@ -44,21 +93,6 @@ export const LandingPage: React.FC = () => {
     staleTime: 15000,
     refetchInterval: 30000,
   });
-
-  // 2. Fetch live activity feed
-  const {
-    data: rawActivityData,
-    isLoading: isActivityLoading,
-  } = useQuery({
-    queryKey: ['public_activity'],
-    queryFn: async () => {
-      const res = await statisticsApi.getActivity();
-      return res.data?.data || [];
-    },
-    staleTime: 15000,
-    refetchInterval: 30000,
-  });
-  const activityData = Array.isArray(rawActivityData) ? rawActivityData : [];
 
   // 3. Fetch live blood inventory
   const {
@@ -426,83 +460,362 @@ export const LandingPage: React.FC = () => {
         )}
       </section>
 
-      {/* Dynamic Activity Feed */}
+      {/* Interactive Compatibility Matrix Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900">Live Network Activity</h3>
-            <p className="text-xs text-slate-500">
-              Anonymized real events streaming across our emergency network.
-            </p>
+        <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200/90 shadow-sm space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold uppercase tracking-wider">
+                <Heart className="w-3.5 h-3.5 fill-rose-600 text-rose-600" />
+                Clinical Transfusion Matrix
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                Blood Compatibility Calculator
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-2xl">
+                Red blood cell compatibility is vital during trauma and surgical procedures. Select your blood group to see who can receive your blood and who you can receive from.
+              </p>
+            </div>
+            <Link
+              to="/compatibility"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-rose-600 hover:text-rose-700 whitespace-nowrap self-start md:self-auto"
+            >
+              Full Clinical Guide & Plasma Matrix <ArrowRight className="w-4 h-4" />
+            </Link>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Live DB Feed
-          </div>
-        </div>
 
-        {isActivityLoading ? (
-          <div className="space-y-3 animate-pulse">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 bg-slate-100 rounded-2xl border border-slate-200" />
-            ))}
-          </div>
-        ) : activityData.length === 0 ? (
-          <TruthfulEmptyState
-            icon={<Activity className="w-8 h-8" />}
-            title="Recent activity will appear here as the community grows"
-            description="When an emergency blood request is submitted, a donor verifies, or a hospital confirms a donation, verified live updates will stream into this feed."
-            actionText="Register as First Donor"
-            actionLink="/register?role=DONOR"
-          />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {activityData.map((item: any) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-2xl bg-white border border-slate-200 shadow-2xs flex items-start gap-3.5 hover:shadow-xs transition-shadow"
-              >
-                <div
-                  className={`p-2.5 rounded-xl shrink-0 ${
-                    item.type === 'FULFILLED'
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : item.type === 'DONATION'
-                      ? 'bg-purple-50 text-purple-600'
-                      : item.type === 'HOSPITAL_JOINED'
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'bg-rose-50 text-rose-600'
+          {/* Blood group selection buttons */}
+          <div>
+            <span className="text-xs font-bold uppercase text-slate-500 tracking-wider block mb-3">
+              Select Your Blood Group:
+            </span>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+              {BLOOD_GROUPS_MATRIX.map((bg) => (
+                <button
+                  key={bg}
+                  type="button"
+                  onClick={() => setCompatSelected(bg)}
+                  className={`py-2.5 px-3 rounded-xl font-black text-sm transition-all text-center ${
+                    compatSelected === bg
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-200 ring-2 ring-rose-500'
+                      : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border border-slate-200'
                   }`}
                 >
-                  {item.type === 'FULFILLED' ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : item.type === 'DONATION' ? (
-                    <Droplets className="w-4 h-4" />
-                  ) : item.type === 'HOSPITAL_JOINED' ? (
-                    <Building2 className="w-4 h-4" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4" />
-                  )}
+                  {BG_SHORT[bg]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Compatibility Results */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {/* Can Donate To */}
+            <div className="p-5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold text-xs">
+                  <ArrowRight className="w-4 h-4" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                      {item.title}
-                    </h4>
-                    <span className="text-[10px] text-slate-400 font-medium shrink-0">
-                      {new Date(item.timestamp).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                    {item.description}
+                <div>
+                  <h4 className="text-sm font-black text-slate-900">
+                    You can donate red cells to:
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Recipients eligible for transfusions with {BG_SHORT[compatSelected]}
                   </p>
                 </div>
               </div>
-            ))}
+              <div className="flex flex-wrap gap-2 pt-1">
+                {canDonateTo.map((target) => (
+                  <span
+                    key={target}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-rose-700 font-extrabold text-xs shadow-2xs"
+                  >
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    {BG_SHORT[target]}
+                  </span>
+                ))}
+              </div>
+              {compatSelected === 'O_NEGATIVE' && (
+                <p className="text-[11px] font-semibold text-rose-700 bg-rose-100/70 p-2.5 rounded-xl">
+                  ⭐ Universal Red Blood Cell Donor: O- blood can be given to anyone in critical emergencies.
+                </p>
+              )}
+            </div>
+
+            {/* Can Receive From */}
+            <div className="p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
+                  <Droplets className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-slate-900">
+                    You can receive red cells from:
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Compatible donors when you require transfusion
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {canReceiveFrom.map((source) => (
+                  <span
+                    key={source}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-indigo-200 text-indigo-700 font-extrabold text-xs shadow-2xs"
+                  >
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    {BG_SHORT[source]}
+                  </span>
+                ))}
+              </div>
+              {compatSelected === 'AB_POSITIVE' && (
+                <p className="text-[11px] font-semibold text-indigo-700 bg-indigo-100/70 p-2.5 rounded-xl">
+                  ⭐ Universal Recipient: AB+ patients can receive red blood cells from any blood group.
+                </p>
+              )}
+            </div>
           </div>
-        )}
+        </div>
+      </section>
+
+      {/* Community Blood Donation Camps & Drives */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider mb-2">
+              <Calendar className="w-3.5 h-3.5 text-rose-600" />
+              Community Blood Drives
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900">
+              Upcoming Blood Donation Camps
+            </h3>
+            <p className="text-xs text-slate-500">
+              Accredited voluntary camps organized by licensed hospitals, medical centers, and certified humanitarian organizations.
+            </p>
+          </div>
+          <Link
+            to="/campaigns"
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 inline-flex items-center gap-1 self-start sm:self-auto"
+          >
+            Explore All Camps & Register <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Verified Camp
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">150 Units Target</span>
+            </div>
+            <h4 className="text-base font-bold text-slate-900">
+              City Red Cross Mega Donation Drive
+            </h4>
+            <div className="space-y-1.5 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Central Community Hall, Bangalore</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Next Saturday • 9:00 AM – 4:00 PM</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-500">Red Cross Society</span>
+              <Link
+                to="/campaigns"
+                className="text-xs font-bold text-rose-600 hover:text-rose-700"
+              >
+                Join Drive →
+              </Link>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Verified Camp
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">100 Units Target</span>
+            </div>
+            <h4 className="text-base font-bold text-slate-900">
+              Rotary Lifesaver Blood Drive
+            </h4>
+            <div className="space-y-1.5 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Civic Centre, Andheri West, Mumbai</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Sunday • 10:00 AM – 5:00 PM</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-500">Rotary Club & Lilavati</span>
+              <Link
+                to="/campaigns"
+                className="text-xs font-bold text-rose-600 hover:text-rose-700"
+              >
+                Join Drive →
+              </Link>
+            </div>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                Verified Camp
+              </span>
+              <span className="text-xs text-slate-400 font-semibold">200 Units Target</span>
+            </div>
+            <h4 className="text-base font-bold text-slate-900">
+              Youth Red Cross Campus Drive
+            </h4>
+            <div className="space-y-1.5 text-xs text-slate-600">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Student Activity Center, New Delhi</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                <span>Oct 12 • 9:30 AM – 3:30 PM</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-slate-500">Youth Red Cross & AIIMS</span>
+              <Link
+                to="/campaigns"
+                className="text-xs font-bold text-rose-600 hover:text-rose-700"
+              >
+                Join Drive →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 24/7 AI Emergency Assistant */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 rounded-3xl p-6 sm:p-10 text-white border border-slate-700 shadow-xl relative overflow-hidden">
+          <div className="pointer-events-none absolute top-0 right-0 w-80 h-80 bg-rose-600/10 blur-[100px] rounded-full" />
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <div className="space-y-4 max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5" />
+                24/7 Clinical & Emergency AI
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-black tracking-tight">
+                AI Emergency Lifeline Assistant
+              </h3>
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Have urgent questions regarding transfusion compatibility, donation eligibility, medication wait times, or emergency protocols? Our AI assistant provides instant clinical guidance in 11 Indian languages.
+              </p>
+              {/* Clickable prompt suggestions */}
+              <div className="flex flex-wrap gap-2 pt-2">
+                {[
+                  'Why is O- blood universally critical?',
+                  'Can someone with high BP donate blood?',
+                  'What should I do in an acute blood shortage?',
+                ].map((prompt) => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    onClick={() => handleOpenAi(prompt)}
+                    className="text-xs text-slate-200 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>💬 {prompt}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="shrink-0 flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => handleOpenAi()}
+                className="px-6 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-900/30 transition-transform active:scale-95 cursor-pointer"
+              >
+                <Bot className="w-4 h-4" />
+                <span>Open AI Assistant</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Frequently Asked Questions */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold uppercase tracking-wider">
+            <HelpCircle className="w-3.5 h-3.5 text-rose-600" />
+            Clear Answers
+          </div>
+          <h3 className="text-2xl sm:text-3xl font-black text-slate-900">
+            Frequently Asked Questions
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500">
+            Common questions regarding donor eligibility, privacy safeguards, and emergency workflows.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {[
+            {
+              q: 'Who is eligible to donate blood on RakthaSethu?',
+              a: 'Healthy individuals between 18 and 65 years old, weighing at least 45-50 kg, with a hemoglobin level of 12.5 g/dL or higher. You must be free from active infectious illnesses, recent major surgeries, or fever.',
+            },
+            {
+              q: 'How often can I donate blood?',
+              a: 'For whole blood donations, men can safely donate every 90 days (3 months), and women every 120 days. Platelet donations (apheresis) can be done more frequently, up to every 2-4 weeks.',
+            },
+            {
+              q: 'Is my personal contact information exposed publicly on RakthaSethu?',
+              a: 'No! Your phone number, email address, and exact home address are masked by default. Only when you explicitly accept a blood request will your contact details be shared with that verified requester.',
+            },
+            {
+              q: 'Does RakthaSethu charge any money for blood requests?',
+              a: 'Absolutely NOT. RakthaSethu is 100% voluntary, free, and humanitarian. Selling or commercializing human blood is strictly illegal and punishable by law.',
+            },
+          ].map((item, idx) => {
+            const isOpen = openFaqIndex === idx;
+            return (
+              <div
+                key={idx}
+                className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs transition-all"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                  className="w-full p-4 sm:p-5 text-left font-bold text-slate-900 flex items-center justify-between text-sm sm:text-base gap-3 cursor-pointer"
+                >
+                  <span>{item.q}</span>
+                  {isOpen ? (
+                    <ChevronUp className="w-4 h-4 text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                  )}
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5 text-xs sm:text-sm text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="text-center pt-4">
+          <Link
+            to="/faq"
+            className="text-xs sm:text-sm font-bold text-rose-600 hover:text-rose-700 inline-flex items-center gap-1"
+          >
+            View All FAQ & Clinical Guidelines <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </section>
 
       {/* How RakthaSethu Saves Lives */}
