@@ -152,6 +152,18 @@ export const notificationApi = {
   markRead: (id: string) => api.patch(`/notifications/${id}/read`),
   delete: (id: string) => api.delete(`/notifications/${id}`),
   clearRead: () => api.delete('/notifications/clear-read'),
+  getVapidPublicKey: () => api.get('/notifications/vapid-public-key'),
+  registerPushSubscription: (data: {
+    endpoint: string;
+    keys: { p256dh?: string; auth?: string };
+    userAgent?: string;
+    deviceType?: string;
+  }) => api.post('/notifications/push-subscription', data),
+  revokePushSubscription: (data: { endpoint: string }) =>
+    api.delete('/notifications/push-subscription', { data }),
+  getPreferences: () => api.get('/notifications/preferences'),
+  updatePreferences: (data: any) => api.patch('/notifications/preferences', data),
+  sendTestPush: () => api.post('/notifications/test-push'),
 };
 
 export const adminApi = {

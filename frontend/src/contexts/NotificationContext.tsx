@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { NotificationItem, NotificationPreferences } from '../types';
 import { notificationApi, API_BASE_URL } from '../services/api';
+import { pushNotificationService } from '../services/pushNotificationService';
+import { offlineStorage } from '../services/offlineStorage';
 import { useAuth } from './AuthContext';
 
 interface NotificationContextType {
@@ -10,14 +12,20 @@ interface NotificationContextType {
   isLoading: boolean;
   isConnected: boolean;
   preferences: NotificationPreferences;
+  isPushSupported: boolean;
+  isPushSubscribed: boolean;
+  pushPermission: NotificationPermission;
   fetchNotifications: (filter?: string) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   deleteNotification: (id: string) => Promise<void>;
   clearRead: () => Promise<void>;
   requestBrowserPermission: () => Promise<boolean>;
+  subscribeToPush: () => Promise<{ success: boolean; error?: string }>;
+  unsubscribeFromPush: () => Promise<{ success: boolean; error?: string }>;
+  sendTestPushNotification: () => Promise<void>;
   playChime: (priority?: string) => void;
-  updatePreferences: (newPrefs: Partial<NotificationPreferences>) => void;
+  updatePreferences: (newPrefs: Partial<NotificationPreferences>) => Promise<void>;
 }
 
 const DEFAULT_PREFS: NotificationPreferences = {
@@ -25,11 +33,17 @@ const DEFAULT_PREFS: NotificationPreferences = {
   soundEnabled: true,
   browserNotifications: false,
   criticalOnly: false,
+  vibrationEnabled: true,
+  emergencyAlerts: true,
+  bloodRequests: true,
+  donationUpdates: true,
+  systemAlerts: true,
+  campaignAlerts: true,
 };
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-// Web Audio API Synthesizer for emergency chime
+// Web Audio API Synthesizer for emergency chime (foreground tab alerts)
 function playAudioChime(isCritical: boolean = false) {
   try {
     const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -42,7 +56,7 @@ function playAudioChime(isCritical: boolean = false) {
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(isCritical ? 880 : 587.33, now); // Higher pitch for critical
+    osc1.frequency.setValueAtTime(isCritical ? 880 : 587.33, now);
     gain1.gain.setValueAtTime(0.15, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
 
@@ -51,7 +65,7 @@ function playAudioChime(isCritical: boolean = false) {
     osc1.start(now);
     osc1.stop(now + 0.35);
 
-    // Second tone
+    // Second harmonic tone
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
     osc2.type = 'triangle';
@@ -64,7 +78,7 @@ function playAudioChime(isCritical: boolean = false) {
     osc2.start(now + 0.15);
     osc2.stop(now + 0.55);
   } catch {
-    // AudioContext blocked by browser autoplay policy until user gesture
+    // Blocked by browser autoplay policy until user gesture
   }
 }
 
@@ -76,6 +90,13 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
+  // Web Push states
+  const [isPushSupported] = useState<boolean>(() => pushNotificationService.isPushSupported());
+  const [isPushSubscribed, setIsPushSubscribed] = useState<boolean>(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(() =>
+    pushNotificationService.getPermissionState()
+  );
+
   const [preferences, setPreferences] = useState<NotificationPreferences>(() => {
     try {
       const saved = localStorage.getItem('rakthasethu_notification_prefs');
@@ -86,6 +107,42 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   });
 
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  // Check subscription status on mount and when auth changes
+  useEffect(() => {
+    if (isPushSupported) {
+      pushNotificationService.getCurrentSubscription().then((sub) => {
+        setIsPushSubscribed(Boolean(sub));
+        setPushPermission(pushNotificationService.getPermissionState());
+      });
+    }
+
+    if (isAuthenticated) {
+      notificationApi
+        .getPreferences()
+        .then((res) => {
+          if (res.data?.data) {
+            const p = res.data.data;
+            setPreferences((prev) => {
+              const updated = {
+                ...prev,
+                soundEnabled: p.soundEnabled ?? prev.soundEnabled,
+                browserNotifications: p.pushEnabled ?? prev.browserNotifications,
+                vibrationEnabled: p.vibrationEnabled ?? prev.vibrationEnabled ?? true,
+                emergencyAlerts: p.emergencyAlerts ?? true,
+                bloodRequests: p.bloodRequests ?? true,
+                donationUpdates: p.donationUpdates ?? true,
+                systemAlerts: p.systemAlerts ?? true,
+                campaignAlerts: p.campaignAlerts ?? true,
+              };
+              localStorage.setItem('rakthasethu_notification_prefs', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated, isPushSupported]);
 
   // Fetch notifications from REST API
   const fetchNotifications = useCallback(
@@ -172,6 +229,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!('Notification' in window)) return false;
     try {
       const permission = await Notification.requestPermission();
+      setPushPermission(permission);
       const granted = permission === 'granted';
       updatePreferences({ browserNotifications: granted });
       return granted;
@@ -180,13 +238,57 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   };
 
-  // Update preferences
-  const updatePreferences = (newPrefs: Partial<NotificationPreferences>) => {
+  // Real Web Push subscription handler
+  const subscribeToPush = async (): Promise<{ success: boolean; error?: string }> => {
+    const result = await pushNotificationService.subscribeToPush();
+    if (result.success) {
+      setIsPushSubscribed(true);
+      setPushPermission('granted');
+      await updatePreferences({ browserNotifications: true });
+    }
+    return result;
+  };
+
+  // Real Web Push unsubscription handler
+  const unsubscribeFromPush = async (): Promise<{ success: boolean; error?: string }> => {
+    const result = await pushNotificationService.unsubscribeFromPush();
+    if (result.success) {
+      setIsPushSubscribed(false);
+      await updatePreferences({ browserNotifications: false });
+    }
+    return result;
+  };
+
+  // Dispatch test push
+  const sendTestPushNotification = async (): Promise<void> => {
+    await notificationApi.sendTestPush();
+    fetchNotifications();
+  };
+
+  // Update preferences and sync with backend
+  const updatePreferences = async (newPrefs: Partial<NotificationPreferences>) => {
     setPreferences((prev) => {
       const updated = { ...prev, ...newPrefs };
       localStorage.setItem('rakthasethu_notification_prefs', JSON.stringify(updated));
       return updated;
     });
+
+    if (isAuthenticated) {
+      try {
+        await notificationApi.updatePreferences({
+          pushEnabled: newPrefs.browserNotifications !== undefined ? newPrefs.browserNotifications : undefined,
+          soundEnabled: newPrefs.soundEnabled,
+          vibrationEnabled: newPrefs.vibrationEnabled,
+          emergencyAlerts: newPrefs.emergencyAlerts,
+          bloodRequests: newPrefs.bloodRequests,
+          donationUpdates: newPrefs.donationUpdates,
+          systemAlerts: newPrefs.systemAlerts,
+          campaignAlerts: newPrefs.campaignAlerts,
+        });
+      } catch (err) {
+        console.warn('[NotificationContext] Could not sync preferences to backend:', err);
+      }
+    }
   };
 
   // Setup Real-Time SSE Stream with auto-reconnect and offline recovery
@@ -230,7 +332,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
             const updatedUnread: number = data.unreadCount ?? 1;
 
             setNotifications((prev) => {
-              // Avoid duplicate if already in state
               if (prev.some((n) => n.id === newNotif.id)) return prev;
               return [newNotif, ...prev];
             });
@@ -241,27 +342,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
               setCriticalCount((c) => c + 1);
             }
 
-            // Audio alert
+            // Foreground Audio alert
             if (preferences.soundEnabled) {
               playAudioChime(newNotif.priority === 'CRITICAL');
             }
 
-            // Browser desktop push notification if backgrounded
-            if (
-              preferences.browserNotifications &&
-              'Notification' in window &&
-              Notification.permission === 'granted' &&
-              document.visibilityState === 'hidden'
-            ) {
-              try {
-                new Notification(newNotif.title, {
-                  body: newNotif.message,
-                  icon: '/icon-192.png',
-                  tag: newNotif.id,
-                });
-              } catch {
-                // Ignore desktop notification failure
-              }
+            // Foreground Vibration alert (if supported and enabled)
+            if (preferences.vibrationEnabled !== false) {
+              pushNotificationService.vibrate(newNotif.priority || 'NORMAL');
             }
           } catch (err) {
             console.error('[NotificationContext] Error parsing incoming SSE event:', err);
@@ -282,7 +370,6 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         sse.onerror = () => {
           setIsConnected(false);
           if (sse) sse.close();
-          // Auto-reconnect after 4 seconds
           reconnectTimeout = setTimeout(connectSSE, 4000);
         };
       } catch (err) {
@@ -292,8 +379,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     connectSSE();
 
-    // Reconnect and recover missed notifications when network comes back online
-    const handleOnline = () => {
+    // Reconnect, recover missed notifications, and sync queued offline actions
+    const handleOnline = async () => {
+      console.log('[NotificationContext] Network re-established. Synchronizing offline queue and alerts...');
+      try {
+        await offlineStorage.syncAllPendingActions();
+      } catch (syncErr) {
+        console.error('[NotificationContext] Offline sync error:', syncErr);
+      }
       fetchNotifications();
       connectSSE();
     };
@@ -309,7 +402,14 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
       setIsConnected(false);
     };
-  }, [isAuthenticated, token, fetchNotifications, preferences.soundEnabled, preferences.browserNotifications]);
+  }, [
+    isAuthenticated,
+    token,
+    fetchNotifications,
+    preferences.soundEnabled,
+    preferences.vibrationEnabled,
+    preferences.browserNotifications,
+  ]);
 
   return (
     <NotificationContext.Provider
@@ -320,12 +420,18 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isLoading,
         isConnected,
         preferences,
+        isPushSupported,
+        isPushSubscribed,
+        pushPermission,
         fetchNotifications,
         markAsRead,
         markAllAsRead,
         deleteNotification,
         clearRead,
         requestBrowserPermission,
+        subscribeToPush,
+        unsubscribeFromPush,
+        sendTestPushNotification,
         playChime,
         updatePreferences,
       }}

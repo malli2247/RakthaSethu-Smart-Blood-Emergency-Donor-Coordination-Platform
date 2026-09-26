@@ -244,4 +244,10 @@ export interface NotificationPreferences {
   soundEnabled: boolean;
   browserNotifications: boolean;
   criticalOnly: boolean;
+  vibrationEnabled?: boolean;
+  emergencyAlerts?: boolean;
+  bloodRequests?: boolean;
+  donationUpdates?: boolean;
+  systemAlerts?: boolean;
+  campaignAlerts?: boolean;
 }

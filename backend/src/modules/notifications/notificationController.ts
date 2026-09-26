@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { RealtimeNotificationService } from '../../services/realtimeNotificationService';
+import { WebPushService } from '../../services/webPushService';
 import { config } from '../../config';
 
 export async function getUserNotifications(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -173,4 +174,173 @@ export async function streamNotifications(req: Request, res: Response): Promise<
   }
 
   RealtimeNotificationService.addClient(user.id, user.role, res);
+}
+
+/**
+ * Returns VAPID public key for frontend subscription
+ */
+export async function getVapidPublicKey(req: Request, res: Response): Promise<void> {
+  sendSuccess(res, { publicKey: config.push.vapidPublicKey });
+}
+
+/**
+ * Register or update push subscription for the authenticated user
+ */
+export async function registerPushSubscription(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const { endpoint, keys, userAgent, deviceType } = req.body;
+
+    if (!endpoint || !keys?.p256dh || !keys?.auth) {
+      throw new AppError('Valid PushSubscription with endpoint and keys is required', 400);
+    }
+
+    const subscription = await WebPushService.registerSubscription(userId, {
+      endpoint,
+      keys,
+      userAgent: userAgent || req.headers['user-agent'],
+      deviceType: deviceType || 'DESKTOP',
+    });
+
+    sendSuccess(res, subscription, 'Push subscription registered successfully');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Revoke push subscription
+ */
+export async function revokePushSubscription(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const endpoint = req.body?.endpoint || (req.query?.endpoint as string);
+
+    if (!endpoint) {
+      throw new AppError('Endpoint is required to revoke subscription', 400);
+    }
+
+    await WebPushService.revokeSubscription(endpoint, userId);
+    sendSuccess(res, null, 'Push subscription revoked');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Track user notification click
+ */
+export async function trackNotificationClick(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { notificationId, endpoint } = req.body;
+    if (notificationId) {
+      await WebPushService.recordClick(notificationId, endpoint);
+    }
+    sendSuccess(res, null, 'Click recorded');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Get notification preferences for authenticated user
+ */
+export async function getNotificationPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    let prefs = await prisma.notificationPreference.findUnique({
+      where: { userId },
+    });
+
+    if (!prefs) {
+      prefs = await prisma.notificationPreference.create({
+        data: { userId },
+      });
+    }
+
+    sendSuccess(res, prefs);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Update notification preferences for authenticated user
+ */
+export async function updateNotificationPreferences(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const {
+      pushEnabled,
+      soundEnabled,
+      vibrationEnabled,
+      emergencyAlerts,
+      bloodRequests,
+      donationUpdates,
+      systemAlerts,
+      campaignAlerts,
+    } = req.body;
+
+    const updated = await prisma.notificationPreference.upsert({
+      where: { userId },
+      create: {
+        userId,
+        ...(pushEnabled !== undefined && { pushEnabled: Boolean(pushEnabled) }),
+        ...(soundEnabled !== undefined && { soundEnabled: Boolean(soundEnabled) }),
+        ...(vibrationEnabled !== undefined && { vibrationEnabled: Boolean(vibrationEnabled) }),
+        ...(emergencyAlerts !== undefined && { emergencyAlerts: Boolean(emergencyAlerts) }),
+        ...(bloodRequests !== undefined && { bloodRequests: Boolean(bloodRequests) }),
+        ...(donationUpdates !== undefined && { donationUpdates: Boolean(donationUpdates) }),
+        ...(systemAlerts !== undefined && { systemAlerts: Boolean(systemAlerts) }),
+        ...(campaignAlerts !== undefined && { campaignAlerts: Boolean(campaignAlerts) }),
+      },
+      update: {
+        ...(pushEnabled !== undefined && { pushEnabled: Boolean(pushEnabled) }),
+        ...(soundEnabled !== undefined && { soundEnabled: Boolean(soundEnabled) }),
+        ...(vibrationEnabled !== undefined && { vibrationEnabled: Boolean(vibrationEnabled) }),
+        ...(emergencyAlerts !== undefined && { emergencyAlerts: Boolean(emergencyAlerts) }),
+        ...(bloodRequests !== undefined && { bloodRequests: Boolean(bloodRequests) }),
+        ...(donationUpdates !== undefined && { donationUpdates: Boolean(donationUpdates) }),
+        ...(systemAlerts !== undefined && { systemAlerts: Boolean(systemAlerts) }),
+        ...(campaignAlerts !== undefined && { campaignAlerts: Boolean(campaignAlerts) }),
+      },
+    });
+
+    sendSuccess(res, updated, 'Notification preferences updated');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Send test push notification to user's registered devices
+ */
+export async function sendTestPush(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const testNotification = await prisma.notification.create({
+      data: {
+        userId,
+        title: '🧪 RakthaSethu Push Test',
+        message: 'Web push notifications are working in real-time across your devices!',
+        priority: 'HIGH',
+        category: 'SYSTEM',
+        link: '/notifications',
+        actionUrl: '/notifications',
+      },
+    });
+
+    await WebPushService.sendToUser(userId, {
+      id: testNotification.id,
+      title: testNotification.title,
+      message: testNotification.message,
+      priority: 'HIGH',
+      category: 'SYSTEM',
+      actionUrl: '/notifications',
+    });
+
+    sendSuccess(res, { notificationId: testNotification.id }, 'Test push dispatched');
+  } catch (error) {
+    next(error);
+  }
 }

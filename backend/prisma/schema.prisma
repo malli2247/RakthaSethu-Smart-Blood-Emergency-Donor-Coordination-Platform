@@ -31,6 +31,8 @@ model User {
   bloodRequests    BloodRequest[]    @relation("UserBloodRequests")
   organizedCampaigns Campaign[]      @relation("OrganizerCampaigns")
   bloodReceipts    BloodReceipt[]
+  pushSubscriptions PushSubscription[]
+  notificationPreferences NotificationPreference?
 
   @@index([email])
   @@index([role])
@@ -313,26 +315,93 @@ model BloodInventory {
 }
 
 model Notification {
-  id                   String           @id @default(uuid())
+  id                   String                 @id @default(uuid())
   userId               String
-  user                 User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   title                String
   message              String
-  type                 String           @default("SYSTEM_NOTICE")
-  priority             String           @default("NORMAL")
-  category             String?          @default("GENERAL")
+  type                 String                 @default("SYSTEM_NOTICE")
+  priority             String                 @default("NORMAL")
+  category             String?                @default("GENERAL")
   link                 String?
   actionUrl            String?
   metadata             String?
-  isRead               Boolean          @default(false)
+  relatedRequestId     String?
+  relatedDonationId    String?
+  relatedHospitalId    String?
+  relatedBloodBankId   String?
+  isRead               Boolean                @default(false)
   readAt               DateTime?
   expiresAt            DateTime?
-  deliveryChannel      String?          @default("IN_APP")
-  createdAt            DateTime         @default(now())
+  deliveryChannel      String?                @default("IN_APP")
+  createdAt            DateTime               @default(now())
+
+  deliveries           NotificationDelivery[]
 
   @@index([userId, isRead])
   @@index([priority])
   @@index([createdAt])
+  @@index([relatedRequestId])
+}
+
+model PushSubscription {
+  id              String                 @id @default(uuid())
+  userId          String
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint        String                 @unique
+  p256dh          String
+  auth            String
+  userAgent       String?
+  deviceType      String?                @default("DESKTOP")
+  isActive        Boolean                @default(true)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  lastSuccessAt   DateTime?
+  lastFailureAt   DateTime?
+  failureCount    Int                    @default(0)
+  revokedAt       DateTime?
+
+  deliveries      NotificationDelivery[]
+
+  @@index([userId, isActive])
+  @@index([endpoint])
+}
+
+model NotificationDelivery {
+  id              String            @id @default(uuid())
+  notificationId  String
+  notification    Notification      @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  subscriptionId  String
+  subscription    PushSubscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  status          String            @default("QUEUED")
+  attemptedAt     DateTime          @default(now())
+  deliveredAt     DateTime?
+  clickedAt       DateTime?
+  statusCode      Int?
+  errorCode       String?
+  errorMessage    String?
+
+  @@index([notificationId])
+  @@index([subscriptionId])
+  @@index([status])
+}
+
+model NotificationPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pushEnabled        Boolean  @default(true)
+  soundEnabled       Boolean  @default(true)
+  vibrationEnabled   Boolean  @default(true)
+  emergencyAlerts    Boolean  @default(true)
+  bloodRequests      Boolean  @default(true)
+  donationUpdates    Boolean  @default(true)
+  systemAlerts       Boolean  @default(true)
+  campaignAlerts     Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Campaign {

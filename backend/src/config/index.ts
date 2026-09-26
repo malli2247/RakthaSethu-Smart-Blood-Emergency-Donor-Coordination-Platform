@@ -92,6 +92,16 @@ export const config = {
     enabled: process.env.ENABLE_AI_FEATURES !== 'false',
   },
 
+  push: {
+    vapidPublicKey:
+      process.env.VAPID_PUBLIC_KEY ||
+      'BD3wUSOHMziCiqA6EoULEnRcC7ouASGCDyyQ_0L7HSImy-ByJqC9ooZsVGGyUnBMPwig_hf5I0FOMtD5IGhtpxA',
+    vapidPrivateKey:
+      process.env.VAPID_PRIVATE_KEY ||
+      'PO8bjY2xH7m065PJN6pd-61D688dZ_EeYaEEU3Bj9UM',
+    vapidSubject: process.env.VAPID_SUBJECT || 'mailto:admin@rakthasethu.org',
+  },
+
   constants: {
     DONATION_INTERVAL_DAYS: 90, // Minimum days between whole blood donations
     DEFAULT_SEARCH_RADIUS_KM: 50,

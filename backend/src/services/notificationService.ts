@@ -3,6 +3,7 @@ import { EmailService } from './emailService';
 import { SmsService } from './smsService';
 import { logger } from '../utils/logger';
 import { RealtimeNotificationService } from './realtimeNotificationService';
+import { WebPushService } from './webPushService';
 
 export interface DispatchNotificationOptions {
   userId: string;
@@ -156,9 +157,22 @@ export class NotificationService {
       } catch (sseErr) {
         logger.warn(`[NotificationService] SSE broadcast warning for user ${userId}:`, sseErr);
       }
+
+      // 4. Dispatch Web Push notification to registered background/offline devices
+      WebPushService.sendToUser(userId, {
+        id: createdNotification.id,
+        title,
+        message,
+        priority,
+        category,
+        actionUrl: targetActionUrl || undefined,
+        metadata,
+      }).catch((pushErr) => {
+        logger.error(`[NotificationService] Web Push delivery error for user ${userId}:`, pushErr);
+      });
     }
 
-    // 4. Dispatch Email asynchronously if provided
+    // 5. Dispatch Email asynchronously if provided
     if (email && email.to) {
       EmailService.sendMail({
         to: email.to,
