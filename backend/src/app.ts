@@ -14,6 +14,7 @@ import { donorRouter } from './modules/donors/donorRoutes';
 import { hospitalRouter } from './modules/hospitals/hospitalRoutes';
 import { bloodBankRouter } from './modules/bloodbanks/bloodBankRoutes';
 import { campaignRouter } from './modules/campaigns/campaignRoutes';
+import { campRouter } from './modules/camps/campRoutes';
 import { volunteerRouter } from './modules/volunteers/volunteerRoutes';
 import { notificationRouter } from './modules/notifications/notificationRoutes';
 import { adminRouter } from './modules/admin/adminRoutes';
@@ -157,7 +158,8 @@ export function createApp(): Express {
   app.use('/api/donors', donorRouter);
   app.use('/api/hospitals', hospitalRouter);
   app.use('/api/blood-banks', bloodBankRouter);
-  app.use('/api/campaigns', campaignRouter);
+  app.use('/api/camps', campRouter);
+  app.use('/api/campaigns', campRouter);
   app.use('/api/volunteers', volunteerRouter);
   app.use('/api/notifications', notificationRouter);
   app.use('/api/admin', adminRouter);

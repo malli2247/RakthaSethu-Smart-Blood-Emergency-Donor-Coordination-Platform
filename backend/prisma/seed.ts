@@ -337,33 +337,35 @@ async function main() {
   });
   console.log('✅ Created Volunteer: volunteer@rakthasethu.org');
 
-  // 8. Public Blood Donation Campaign
-  const campaignStartDate = new Date();
-  campaignStartDate.setDate(campaignStartDate.getDate() + 3);
-  const campaignEndDate = new Date(campaignStartDate);
-  campaignEndDate.setHours(campaignEndDate.getHours() + 8);
+  // 8. Public Blood Donation Campaign (Strictly isolated to DEMO environments, NEVER in production)
+  if (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO_DATA === 'true') {
+    const campaignStartDate = new Date();
+    campaignStartDate.setDate(campaignStartDate.getDate() + 3);
+    const campaignEndDate = new Date(campaignStartDate);
+    campaignEndDate.setHours(campaignEndDate.getHours() + 8);
 
-  await prisma.campaign.create({
-    data: {
-      organizerId: admin.id,
-      title: 'Delhi Lifesaver Mega Blood Donation Camp 2026',
-      description:
-        'Join the capital-wide humanitarian blood drive organized by RakthaSethu in partnership with Red Cross. Every pint can save up to three lives. Free health screening, donor certificate, and refreshments provided.',
-      startDate: campaignStartDate,
-      endDate: campaignEndDate,
-      location: 'India Gate Lawns & Community Pavilion',
-      address: 'Rajpath, India Gate',
-      city: 'New Delhi',
-      state: 'Delhi',
-      latitude: 28.6129,
-      longitude: 77.2295,
-      bloodGroupsNeeded: 'ALL (Urgent need for O- and B-)',
-      targetUnits: 250,
-      registeredCount: 42,
-      status: 'UPCOMING',
-    },
-  });
-  console.log('✅ Created Mega Blood Donation Drive campaign');
+    await prisma.campaign.create({
+      data: {
+        organizerId: admin.id,
+        title: '[DEMO DATA — NOT REAL] Delhi Lifesaver Donation Drive',
+        description:
+          'DEMO DATA — NOT REAL. Test fixture for local interface development only.',
+        startDate: campaignStartDate,
+        endDate: campaignEndDate,
+        location: 'India Gate Lawns & Community Pavilion',
+        address: 'Rajpath, India Gate',
+        city: 'New Delhi',
+        state: 'Delhi',
+        latitude: 28.6129,
+        longitude: 77.2295,
+        bloodGroupsNeeded: 'ALL',
+        targetUnits: 100,
+        registeredCount: 0,
+        status: 'UPCOMING',
+      },
+    });
+    console.log('ℹ️ Seeded isolated demo campaign (DEMO DATA — NOT REAL)');
+  }
 
   console.log('\n🎉 RakthaSethu Database Seed Complete!');
   console.log('----------------------------------------------------');

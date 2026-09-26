@@ -44,6 +44,7 @@ import { VolunteerDashboard } from '../pages/volunteer/VolunteerDashboard';
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
 import { AdminUsersPage } from '../pages/admin/AdminUsersPage';
 import { AdminVerificationsPage } from '../pages/admin/AdminVerificationsPage';
+import { AdminCampsPage } from '../pages/admin/AdminCampsPage';
 import { CommandCenterPage } from '../pages/admin/CommandCenterPage';
 import { EmergencySimulatorPage } from '../pages/admin/EmergencySimulatorPage';
 
@@ -158,6 +159,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="/admin/simulator" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><EmergencySimulatorPage /></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
         <Route path="/admin/verifications" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminVerificationsPage /></ProtectedRoute>} />
+        <Route path="/admin/camps" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminCampsPage /></ProtectedRoute>} />
 
         {/* Global Notifications Center for all authenticated users */}
         <Route path="/notifications" element={<NotificationCenterPage />} />

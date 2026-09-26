@@ -205,6 +205,42 @@ export interface BloodInventoryItem {
   status: InventoryStatus;
 }
 
+export interface BloodDonationCamp {
+  id: string;
+  source: string;
+  sourceCampId?: string | null;
+  campName: string;
+  description?: string | null;
+  venue: string;
+  address: string;
+  city: string;
+  district?: string | null;
+  state: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  coordinateConfidence: 'EXACT' | 'APPROXIMATE' | 'CITY_LEVEL' | 'NONE';
+  organizerName: string;
+  bloodBankId?: string | null;
+  bloodBankName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  registrationUrl?: string | null;
+  campDate: string;
+  startTime: string;
+  endTime: string;
+  status: 'UPCOMING' | 'TODAY' | 'ONGOING' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED' | 'UNVERIFIED';
+  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  sourceUrl?: string | null;
+  sourceLastUpdatedAt?: string | null;
+  lastFetchedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  distanceKm?: number | null;
+  isCityApproximate?: boolean;
+  registrationCount?: number;
+  isRegistered?: boolean;
+}
+
 export interface Campaign {
   id: string;
   title: string;

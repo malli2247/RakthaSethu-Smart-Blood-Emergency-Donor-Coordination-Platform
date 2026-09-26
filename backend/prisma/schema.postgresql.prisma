@@ -110,6 +110,8 @@ model User {
   notifications    Notification[]
   bloodRequests    BloodRequest[]    @relation("UserBloodRequests")
   organizedCampaigns Campaign[]      @relation("OrganizerCampaigns")
+  createdCamps     BloodDonationCamp[] @relation("CampCreator")
+  verifiedCamps    BloodDonationCamp[] @relation("CampVerifier")
 
   @@index([email])
   @@index([role])
@@ -171,6 +173,7 @@ model DonorProfile {
   matches              DonorMatch[]
   donations            Donation[]
   campaignRegistrations CampaignRegistration[]
+  campRegistrations    CampRegistration[]
 
   @@index([bloodGroup])
   @@index([city, state])
@@ -244,6 +247,7 @@ model BloodBank {
 
   inventory            BloodInventory[]
   donations            Donation[]
+  camps                BloodDonationCamp[]
 
   @@index([city, state])
   @@index([verificationStatus])
@@ -419,6 +423,86 @@ model CampaignRegistration {
   updatedAt            DateTime     @updatedAt
 
   @@unique([campaignId, donorId])
+}
+
+model BloodDonationCamp {
+  id                   String            @id @default(uuid())
+  source               String            @default("RAKTHASETHU")
+  sourceCampId         String?
+  campName             String
+  description          String?
+  venue                String
+  address              String
+  city                 String
+  district             String?
+  state                String
+  latitude             Float?
+  longitude            Float?
+  coordinateConfidence String            @default("NONE")
+  organizerName        String
+  bloodBankId          String?
+  bloodBank            BloodBank?        @relation(fields: [bloodBankId], references: [id], onDelete: SetNull)
+  contactPhone         String?
+  contactEmail         String?
+  registrationUrl      String?
+  campDate             DateTime
+  startTime            String
+  endTime              String
+  status               String            @default("UPCOMING")
+  verificationStatus   String            @default("PENDING")
+  sourceUrl            String?
+  sourceLastUpdatedAt  DateTime?
+  lastFetchedAt        DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  createdBy            String?
+  creator              User?             @relation("CampCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  verifiedBy           String?
+  verifier             User?             @relation("CampVerifier", fields: [verifiedBy], references: [id], onDelete: SetNull)
+  verifiedAt           DateTime?
+  verificationSource   String?
+  verificationNotes    String?
+
+  registrations        CampRegistration[]
+
+  @@unique([source, sourceCampId])
+  @@index([city, state])
+  @@index([campDate])
+  @@index([status])
+  @@index([verificationStatus])
+}
+
+model CampRegistration {
+  id               String            @id @default(uuid())
+  campId           String
+  camp             BloodDonationCamp @relation(fields: [campId], references: [id], onDelete: Cascade)
+  donorId          String
+  donor            DonorProfile      @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  status           String            @default("CONFIRMED")
+  registrationDate DateTime          @default(now())
+  attended         Boolean           @default(false)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([campId, donorId])
+  @@index([campId])
+  @@index([donorId])
+}
+
+model CampSyncLog {
+  id            String    @id @default(uuid())
+  source        String    @default("E_RAKTKOSH")
+  status        String    @default("SUCCESS")
+  campsFetched  Int       @default(0)
+  campsInserted Int       @default(0)
+  campsUpdated  Int       @default(0)
+  errorMessage  String?
+  syncedBy      String?
+  syncedAt      DateTime  @default(now())
+
+  @@index([source])
+  @@index([syncedAt])
 }
 
 model AuditLog {

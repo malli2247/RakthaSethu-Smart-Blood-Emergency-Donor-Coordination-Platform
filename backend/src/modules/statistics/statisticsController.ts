@@ -34,6 +34,7 @@ export async function getPublicStatistics(req: Request, res: Response, next: Nex
           fulfilledRequests,
           successfulDonations,
           unitsAgg,
+          verifiedCamps,
         ] = await Promise.all([
           // 1. Registered active user accounts
           prisma.user.count({
@@ -114,6 +115,11 @@ export async function getPublicStatistics(req: Request, res: Response, next: Nex
             where: { status: 'CONFIRMED' },
             _sum: { units: true },
           }),
+
+          // 12. Officially verified blood donation camps
+          prisma.bloodDonationCamp.count({
+            where: { verificationStatus: 'VERIFIED' },
+          }),
         ]);
 
         const bloodUnitsDonated = unitsAgg._sum.units || 0;
@@ -133,6 +139,7 @@ export async function getPublicStatistics(req: Request, res: Response, next: Nex
           successfulDonations,
           bloodUnitsDonated,
           livesImpacted,
+          bloodCamps: verifiedCamps,
           // Rate calculated strictly from real numbers, 0 if no requests
           fulfillmentRate: bloodRequests > 0 ? Math.round((fulfilledRequests / bloodRequests) * 100) : 0,
         };

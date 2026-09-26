@@ -19,6 +19,7 @@ import {
   ExternalLink,
   RefreshCw,
   Server,
+  Calendar,
   Bell,
   Cpu,
   Radio,
@@ -145,6 +146,13 @@ export const AdminDashboard: React.FC = () => {
             className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md transition-colors"
           >
             Verifications ({pendingOrgCount})
+          </Link>
+          <Link
+            to="/admin/camps"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition-colors flex items-center gap-1.5"
+          >
+            <Calendar className="w-3.5 h-3.5 text-rose-400" />
+            Blood Camps
           </Link>
           <Link
             to="/admin/users"

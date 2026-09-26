@@ -137,13 +137,31 @@ export const volunteerApi = {
   getTasks: () => api.get('/volunteers/tasks'),
 };
 
-export const campaignApi = {
-  list: (params?: any) => api.get('/campaigns', { params }),
-  getById: (id: string) => api.get(`/campaigns/${id}`),
-  create: (data: any) => api.post('/campaigns', data),
-  register: (campaignId: string) => api.post(`/campaigns/${campaignId}/register`),
-  cancel: (campaignId: string) => api.delete(`/campaigns/${campaignId}/register`),
+export const campApi = {
+  list: (params?: {
+    lat?: number;
+    lon?: number;
+    city?: string;
+    district?: string;
+    state?: string;
+    radius?: number;
+    expand?: boolean;
+    status?: string;
+    limit?: number;
+  }) => api.get('/camps', { params }),
+  getById: (id: string) => api.get(`/camps/${id}`),
+  create: (data: any) => api.post('/camps', data),
+  register: (campId: string) => api.post(`/camps/${campId}/register`),
+  cancel: (campId: string) => api.delete(`/camps/${campId}/register`),
+  adminSync: () => api.post('/camps/admin/sync'),
+  adminImport: (camps: any[], source?: string) => api.post('/camps/admin/import', { camps, source }),
+  getSyncStatus: () => api.get('/camps/admin/sync-status'),
+  verifyCamp: (id: string, notes?: string) => api.patch(`/camps/admin/${id}/verify`, { notes }),
+  rejectCamp: (id: string, notes?: string) => api.patch(`/camps/admin/${id}/reject`, { notes }),
+  cancelCamp: (id: string, reason?: string) => api.patch(`/camps/admin/${id}/cancel`, { reason }),
 };
+
+export const campaignApi = campApi;
 
 export const notificationApi = {
   list: (params?: { filter?: string; page?: number; limit?: number }) =>

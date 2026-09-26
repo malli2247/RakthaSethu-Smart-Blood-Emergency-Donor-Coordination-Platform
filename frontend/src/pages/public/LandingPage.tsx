@@ -25,7 +25,7 @@ import {
   Bot,
   Check,
 } from 'lucide-react';
-import { statisticsApi } from '../../services/api';
+import { statisticsApi, campApi } from '../../services/api';
 import { AnimatedCounter } from '../../components/common/AnimatedCounter';
 import { ParticleBackground } from '../../components/common/ParticleBackground';
 
@@ -108,6 +108,20 @@ export const LandingPage: React.FC = () => {
     refetchInterval: 60000,
   });
   const inventoryData = Array.isArray(rawInventoryData) ? rawInventoryData : [];
+
+  // 4. Fetch 100% real verified blood donation camps (Zero fake data)
+  const {
+    data: rawCampsData,
+    isLoading: isCampsLoading,
+  } = useQuery({
+    queryKey: ['landing_verified_camps'],
+    queryFn: async () => {
+      const res = await campApi.list({ limit: 3, status: 'UPCOMING' });
+      return res.data?.data || [];
+    },
+    staleTime: 60000,
+  });
+  const verifiedCamps = Array.isArray(rawCampsData) ? rawCampsData : [];
 
   const handleQuickSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -601,100 +615,92 @@ export const LandingPage: React.FC = () => {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Verified Camp
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">150 Units Target</span>
+        {isCampsLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-pulse">
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="h-64 rounded-3xl bg-slate-100 border border-slate-200" />
+            ))}
+          </div>
+        ) : verifiedCamps.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {verifiedCamps.map((camp: any) => (
+              <div
+                key={camp.id}
+                className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {camp.source === 'E_RAKTKOSH' ? 'e-RaktKosh Verified' : 'Verified Camp'}
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold">
+                      {camp.status}
+                    </span>
+                  </div>
+                  <h4 className="text-base font-bold text-slate-900 leading-snug">
+                    {camp.campName}
+                  </h4>
+                  <div className="space-y-1.5 text-xs text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span className="truncate">
+                        {camp.venue}, {camp.city}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>
+                        {new Date(camp.campDate).toLocaleDateString(undefined, {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })}{' '}
+                        • {camp.startTime} – {camp.endTime}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-slate-500 truncate max-w-[140px]">
+                    {camp.organizerName}
+                  </span>
+                  <Link
+                    to="/campaigns"
+                    className="text-xs font-bold text-rose-600 hover:text-rose-700 shrink-0"
+                  >
+                    View Details →
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 rounded-3xl bg-white border border-slate-200 text-center max-w-xl mx-auto space-y-3 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+              <Calendar className="w-6 h-6" />
             </div>
             <h4 className="text-base font-bold text-slate-900">
-              City Red Cross Mega Donation Drive
+              No Verified Blood Donation Camps Currently Scheduled
             </h4>
-            <div className="space-y-1.5 text-xs text-slate-600">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Central Community Hall, Bangalore</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Next Saturday • 9:00 AM – 4:00 PM</span>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">Red Cross Society</span>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+              RakthaSethu enforces a zero-fake-data policy. We only display authenticated camps synchronized with official healthcare channels or verified by accredited hospital staff.
+            </p>
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
               <Link
                 to="/campaigns"
-                className="text-xs font-bold text-rose-600 hover:text-rose-700"
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-colors"
               >
-                Join Drive →
+                Search Nearby Camps
+              </Link>
+              <Link
+                to="/register?role=HOSPITAL"
+                className="px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors"
+              >
+                Organize a Verified Camp
               </Link>
             </div>
           </div>
-
-          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Verified Camp
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">100 Units Target</span>
-            </div>
-            <h4 className="text-base font-bold text-slate-900">
-              Rotary Lifesaver Blood Drive
-            </h4>
-            <div className="space-y-1.5 text-xs text-slate-600">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Civic Centre, Andheri West, Mumbai</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Sunday • 10:00 AM – 5:00 PM</span>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">Rotary Club & Lilavati</span>
-              <Link
-                to="/campaigns"
-                className="text-xs font-bold text-rose-600 hover:text-rose-700"
-              >
-                Join Drive →
-              </Link>
-            </div>
-          </div>
-
-          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-2xs space-y-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Verified Camp
-              </span>
-              <span className="text-xs text-slate-400 font-semibold">200 Units Target</span>
-            </div>
-            <h4 className="text-base font-bold text-slate-900">
-              Youth Red Cross Campus Drive
-            </h4>
-            <div className="space-y-1.5 text-xs text-slate-600">
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Student Activity Center, New Delhi</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                <span>Oct 12 • 9:30 AM – 3:30 PM</span>
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-              <span className="text-[11px] font-medium text-slate-500">Youth Red Cross & AIIMS</span>
-              <Link
-                to="/campaigns"
-                className="text-xs font-bold text-rose-600 hover:text-rose-700"
-              >
-                Join Drive →
-              </Link>
-            </div>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* 24/7 AI Emergency Assistant */}
