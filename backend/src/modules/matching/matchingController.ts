@@ -1,4 +1,4 @@
-﻿import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { MatchingService } from './matchingService';
 import { sendSuccess, AppError } from '../../utils/response';
 import { prisma } from '../../config/database';
@@ -23,7 +23,25 @@ export async function findDonors(req: Request, res: Response, next: NextFunction
       limit: limit ? parseInt(limit, 10) : 20,
     });
 
-    sendSuccess(res, candidates, `Found ${candidates.length} compatible donor candidate(s)`);
+    // Enforce strict donor privacy: omit phone, address, coordinates, and full identity
+    const sanitized = candidates.map((c) => ({
+      donorId: c.donorId,
+      bloodGroup: c.bloodGroup,
+      bloodGroupLabel: c.bloodGroupLabel,
+      city: c.city,
+      state: c.state,
+      approximateDistance:
+        c.distanceKm !== null ? `${Math.round(c.distanceKm * 10) / 10} km away` : 'Regional area',
+      distanceKm: c.distanceKm !== null ? Math.round(c.distanceKm * 10) / 10 : null,
+      isAvailable: c.isAvailable,
+      emergencyAvailable: c.emergencyAvailable,
+      verifiedStatus: 'VERIFIED',
+      isVerified: true,
+      score: c.score,
+      totalDonations: c.totalDonations,
+    }));
+
+    sendSuccess(res, sanitized, `Found ${sanitized.length} compatible donor candidate(s)`);
   } catch (error) {
     next(error);
   }

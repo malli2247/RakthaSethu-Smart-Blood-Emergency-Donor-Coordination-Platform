@@ -1,8 +1,9 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { donorApi } from '../../services/api';
 import { BloodGroupBadge } from '../../components/BloodGroupBadge';
-import { User, Heart, MapPin, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User, Heart, MapPin, ShieldCheck, CheckCircle2, AlertCircle, Phone, ShieldAlert, Lock } from 'lucide-react';
 import { BloodGroup } from '../../types';
+import { OtpVerificationModal } from '../../components/auth/OtpVerificationModal';
 
 export const DonorProfilePage: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
@@ -13,6 +14,9 @@ export const DonorProfilePage: React.FC = () => {
   const [fullName, setFullName] = useState('');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O_POSITIVE');
   const [gender, setGender] = useState('MALE');
+  const [phone, setPhone] = useState('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [address, setAddress] = useState('');
@@ -21,7 +25,7 @@ export const DonorProfilePage: React.FC = () => {
   const [hidePhoneNumber, setHidePhoneNumber] = useState(false);
   const [hideExactAddress, setHideExactAddress] = useState(true);
 
-  useEffect(() => {
+  const loadProfile = () => {
     donorApi
       .getProfile()
       .then((res) => {
@@ -31,6 +35,8 @@ export const DonorProfilePage: React.FC = () => {
           setFullName(d.fullName);
           setBloodGroup(d.bloodGroup);
           setGender(d.gender);
+          setPhone(d.user?.phone || '');
+          setIsVerified(Boolean(d.user?.isVerified));
           setCity(d.city);
           setState(d.state);
           setAddress(d.address);
@@ -42,6 +48,10 @@ export const DonorProfilePage: React.FC = () => {
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadProfile();
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -52,6 +62,7 @@ export const DonorProfilePage: React.FC = () => {
         fullName,
         bloodGroup,
         gender,
+        phone,
         city,
         state,
         address,
@@ -61,6 +72,7 @@ export const DonorProfilePage: React.FC = () => {
         hideExactAddress,
       });
       setMessage('Profile settings updated successfully!');
+      loadProfile();
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
       setMessage(err.response?.data?.message || 'Failed to update profile');
@@ -170,6 +182,63 @@ export const DonorProfilePage: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile Number & OTP Verification */}
+        <div className="pt-4 border-t border-slate-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+              <Phone className="w-4 h-4 text-rose-600" />
+              Registered Mobile Number & Verification
+            </h3>
+            {isVerified ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                ✓ Verified
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                ⚠ Not verified
+              </span>
+            )}
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex-1 w-full sm:w-auto">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Primary Mobile Number
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setIsVerified(false);
+                }}
+                placeholder="+91 98765 43210"
+                className="w-full max-w-sm px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
+              />
+              {!isVerified && (
+                <p className="text-[11px] text-amber-700 font-medium mt-1">
+                  Verify your mobile number to receive blood-request notifications and participate in donor matching.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={!phone || phone.length < 10}
+              onClick={() => setOtpModalOpen(true)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
+                isVerified
+                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                  : 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm'
+              }`}
+            >
+              {isVerified ? 'Re-verify with OTP' : 'Verify via OTP'}
+            </button>
+          </div>
+        </div>
+
         {/* Availability & Emergency */}
         <div className="pt-4 border-t border-slate-100 space-y-3">
           <h3 className="text-sm font-bold text-slate-900">Donation Availability Preferences</h3>
@@ -255,6 +324,18 @@ export const DonorProfilePage: React.FC = () => {
           {saving ? 'Saving changes...' : 'Save Profile Changes'}
         </button>
       </form>
+
+      <OtpVerificationModal
+        phone={phone}
+        isOpen={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        onVerified={() => {
+          setIsVerified(true);
+          loadProfile();
+          setMessage('Mobile number verified successfully via OTP!');
+          setTimeout(() => setMessage(null), 3000);
+        }}
+      />
     </div>
   );
 };

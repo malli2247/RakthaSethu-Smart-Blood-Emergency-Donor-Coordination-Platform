@@ -1,31 +1,51 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations, SupportedLanguage } from '../i18n/translations';
+import { translations, SupportedLanguage, SUPPORTED_LANGUAGES, LanguageMeta } from '../i18n/translations';
 
 interface LanguageContextType {
   language: SupportedLanguage;
+  supportedLanguages: LanguageMeta[];
   setLanguage: (lang: SupportedLanguage) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<SupportedLanguage>(() => {
-    return (localStorage.getItem('rakthasethu_lang') as SupportedLanguage) || 'en';
+    const saved = localStorage.getItem('rakthasethu_lang') as SupportedLanguage;
+    if (saved && translations[saved]) {
+      return saved;
+    }
+    return 'en';
   });
 
   const setLanguage = (lang: SupportedLanguage) => {
-    setLanguageState(lang);
-    localStorage.setItem('rakthasethu_lang', lang);
+    if (translations[lang]) {
+      setLanguageState(lang);
+      localStorage.setItem('rakthasethu_lang', lang);
+      document.documentElement.lang = lang;
+    }
   };
 
-  const t = (key: string): string => {
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
+  const t = (key: string, params?: Record<string, string | number>): string => {
     const dict = translations[language] || translations.en;
-    return dict[key] || translations.en[key] || key;
+    let text = dict[key] || translations.en[key] || key;
+
+    if (params) {
+      for (const [paramKey, val] of Object.entries(params)) {
+        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(val));
+      }
+    }
+
+    return text;
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, supportedLanguages: SUPPORTED_LANGUAGES, setLanguage, t }}>
       {children}
     </LanguageContext.Provider>
   );

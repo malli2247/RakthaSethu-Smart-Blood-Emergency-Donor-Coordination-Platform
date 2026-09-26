@@ -67,6 +67,8 @@ export const authApi = {
   changePassword: (data: any) => api.post('/auth/change-password', data),
   forgotPassword: (email: string) => api.post('/auth/forgot-password', { email }),
   resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
+  sendOtp: (phone: string) => api.post('/auth/otp/send', { phone }),
+  verifyOtp: (phone: string, otp: string) => api.post('/auth/otp/verify', { phone, otp }),
 };
 
 export const matchingApi = {
@@ -165,6 +167,8 @@ export const adminApi = {
     id: string,
     data: { action: 'FORCE_FULFILL' | 'RESTART_MATCHING' | 'CANCEL'; notes?: string }
   ) => api.post(`/admin/requests/${id}/resolve`, data),
+  getSystemHealth: () => api.get('/admin/system-health'),
+  getLiveEmergencies: () => api.get('/admin/live-emergencies'),
 };
 
 export const aiApi = {

@@ -63,11 +63,25 @@ export async function updateDonorProfile(req: Request, res: Response, next: Next
       hidePhoneNumber,
       hideExactAddress,
       lastDonationDate,
+      phone,
     } = req.body;
 
     const donor = await prisma.donorProfile.findUnique({ where: { userId } });
     if (!donor) {
       throw new AppError('Donor profile not found', 404);
+    }
+
+    if (phone) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user && user.phone !== phone) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { phone, isVerified: false },
+        });
+        const { OtpService } = await import('../../services/otpService');
+        OtpService.invalidateOtp(phone);
+        if (user.phone) OtpService.invalidateOtp(user.phone);
+      }
     }
 
     const updated = await prisma.donorProfile.update({

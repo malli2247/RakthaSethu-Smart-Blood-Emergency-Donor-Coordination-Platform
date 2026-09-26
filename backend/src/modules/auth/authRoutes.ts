@@ -9,6 +9,8 @@ import {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  sendOtp,
+  verifyOtp,
 } from './authController';
 import { validate } from '../../middleware/validate';
 import {
@@ -20,7 +22,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from './authSchemas';
-import { authenticateToken } from '../../middleware/auth';
+import { authenticateToken, optionalAuth } from '../../middleware/auth';
 import { authLimiter } from '../../middleware/rateLimiter';
 
 export const authRouter = Router();
@@ -53,4 +55,8 @@ authRouter.post(
   validate({ body: verifyEmailSchema }),
   verifyEmail
 );
+
+// Mobile OTP Verification Endpoints
+authRouter.post('/otp/send', authLimiter, optionalAuth, sendOtp);
+authRouter.post('/otp/verify', authLimiter, optionalAuth, verifyOtp);
 

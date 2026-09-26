@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Role, BloodGroup } from '../../types';
+import { OtpVerificationModal } from '../../components/auth/OtpVerificationModal';
 
 export const RegisterPage: React.FC = () => {
   const { register } = useAuth();
@@ -28,6 +29,8 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [isPhoneVerified, setIsPhoneVerified] = useState(false);
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -241,17 +244,48 @@ export const RegisterPage: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Primary Phone *
-              </label>
-              <input
-                type="tel"
-                required
-                placeholder="+91 98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Primary Phone *
+                </label>
+                {role === 'DONOR' && (
+                  isPhoneVerified ? (
+                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Verified
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!phone || phone.length < 10}
+                      onClick={() => setOtpModalOpen(true)}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline disabled:opacity-50 disabled:no-underline"
+                    >
+                      Verify via OTP
+                    </button>
+                  )
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="tel"
+                  required
+                  placeholder="+91 98765 43210"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setIsPhoneVerified(false);
+                  }}
+                  className={`w-full px-3 py-2.5 text-sm rounded-xl border focus:outline-none focus:ring-2 focus:ring-rose-500 ${
+                    isPhoneVerified ? 'border-emerald-300 bg-emerald-50/20' : 'border-slate-300'
+                  }`}
+                />
+              </div>
+              {role === 'DONOR' && !isPhoneVerified && (
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Verify mobile ownership to receive emergency request alerts.
+                </p>
+              )}
             </div>
           </div>
 
@@ -626,6 +660,15 @@ export const RegisterPage: React.FC = () => {
           </Link>
         </p>
       </div>
+
+      <OtpVerificationModal
+        phone={phone}
+        isOpen={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        onVerified={() => {
+          setIsPhoneVerified(true);
+        }}
+      />
     </div>
   );
 };

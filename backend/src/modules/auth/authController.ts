@@ -585,3 +585,54 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
   }
 }
 
+export async function sendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { phone } = req.body;
+    if (!phone) {
+      throw new AppError('Mobile phone number is required.', 400, 'PHONE_REQUIRED');
+    }
+
+    const { OtpService } = await import('../../services/otpService');
+    const result = await OtpService.sendOtp(phone, req.user?.id, req.ip);
+
+    if (!result.success) {
+      res.status(429).json({
+        success: false,
+        message: result.message,
+        data: {
+          cooldownSeconds: result.cooldownSeconds,
+          expiresInSeconds: result.expiresInSeconds,
+        },
+      });
+      return;
+    }
+
+    sendSuccess(res, {
+      cooldownSeconds: result.cooldownSeconds,
+      expiresInSeconds: result.expiresInSeconds,
+    }, result.message);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      throw new AppError('Both phone and 6-digit OTP code are required.', 400, 'MISSING_FIELDS');
+    }
+
+    const { OtpService } = await import('../../services/otpService');
+    const result = await OtpService.verifyOtp(phone, otp, req.user?.id, req.ip);
+
+    if (!result.verified) {
+      throw new AppError(result.message, 400, 'OTP_VERIFICATION_FAILED');
+    }
+
+    sendSuccess(res, { verified: true }, result.message);
+  } catch (error) {
+    next(error);
+  }
+}
+

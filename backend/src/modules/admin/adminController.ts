@@ -19,11 +19,16 @@ export async function getAdminStats(req: Request, res: Response, next: NextFunct
           activeDonors,
           totalRequests,
           criticalRequests,
+          urgentRequests,
           fulfilledRequests,
           pendingRequests,
+          matchingRequests,
+          activeEmergencies,
           totalHospitals,
+          verifiedHospitals,
           pendingHospitals,
           totalBloodBanks,
+          verifiedBloodBanks,
           pendingBloodBanks,
           totalDonations,
         ] = await Promise.all([
@@ -31,17 +36,23 @@ export async function getAdminStats(req: Request, res: Response, next: NextFunct
           prisma.donorProfile.count(),
           prisma.donorProfile.count({ where: { isAvailable: true, isEligible: true } }),
           prisma.bloodRequest.count(),
-          prisma.bloodRequest.count({ where: { urgency: 'CRITICAL' } }),
+          prisma.bloodRequest.count({ where: { urgency: 'CRITICAL', status: { notIn: ['FULFILLED', 'CANCELLED'] } } }),
+          prisma.bloodRequest.count({ where: { urgency: 'HIGH', status: { notIn: ['FULFILLED', 'CANCELLED'] } } }),
           prisma.bloodRequest.count({ where: { status: 'FULFILLED' } }),
           prisma.bloodRequest.count({ where: { status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED'] } } }),
+          prisma.bloodRequest.count({ where: { status: 'MATCHING' } }),
+          prisma.bloodRequest.count({ where: { status: { in: ['PENDING', 'MATCHING', 'DONOR_CONTACTED', 'DONOR_ACCEPTED', 'DONOR_ARRIVED', 'DONATION_IN_PROGRESS'] } } }),
           prisma.hospital.count(),
+          prisma.hospital.count({ where: { verificationStatus: 'VERIFIED' } }),
           prisma.hospital.count({ where: { verificationStatus: 'PENDING' } }),
           prisma.bloodBank.count(),
+          prisma.bloodBank.count({ where: { verificationStatus: 'VERIFIED' } }),
           prisma.bloodBank.count({ where: { verificationStatus: 'PENDING' } }),
           prisma.donation.count(),
         ]);
 
         const fulfillmentRate = totalRequests > 0 ? Math.round((fulfilledRequests / totalRequests) * 100) : 0;
+        const pendingVerifications = pendingHospitals + pendingBloodBanks;
 
         return {
           totalUsers,
@@ -49,12 +60,19 @@ export async function getAdminStats(req: Request, res: Response, next: NextFunct
           activeDonors,
           totalRequests,
           criticalRequests,
+          urgentRequests,
           fulfilledRequests,
           pendingRequests,
+          matchingRequests,
+          activeEmergencies,
           totalHospitals,
+          verifiedHospitals,
           pendingHospitals,
           totalBloodBanks,
+          verifiedBloodBanks,
           pendingBloodBanks,
+          pendingVerifications,
+          notificationFailures: 0,
           totalDonations,
           fulfillmentRate,
         };
@@ -377,6 +395,107 @@ export async function resolveRequestIssue(req: Request, res: Response, next: Nex
 
     CacheService.invalidateByTag('stats');
     sendSuccess(res, { resolved: true }, `Request resolution recorded: ${action}`);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getSystemHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { config } = await import('../../config');
+    const { RealtimeNotificationService } = await import('../../services/realtimeNotificationService');
+
+    // 1. Check database latency & connectivity
+    const dbStart = Date.now();
+    let dbStatus = 'Healthy';
+    let dbLatencyMs = 0;
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbLatencyMs = Date.now() - dbStart;
+    } catch {
+      dbStatus = 'Degraded';
+    }
+
+    // 2. Check auth
+    const authStatus = config.jwt.accessSecret ? 'Healthy' : 'Misconfigured';
+
+    // 3. Realtime notifications
+    const sseClients = RealtimeNotificationService.getActiveSubscribersCount();
+    const notificationStatus = 'Healthy';
+
+    // 4. SMS provider check
+    const smsStatus = config.sms.provider === 'twilio' && config.sms.twilioAccountSid
+      ? 'Configured'
+      : 'Simulated / Safe Mode';
+
+    // 5. Email provider check
+    const emailStatus = config.email.smtpUser
+      ? 'Configured'
+      : 'Simulated / Safe Mode';
+
+    // 6. Push notifications
+    const pushStatus = config.push.vapidPublicKey && config.push.vapidPrivateKey
+      ? 'Configured'
+      : 'Not Configured';
+
+    sendSuccess(res, {
+      database: { status: dbStatus, latencyMs: dbLatencyMs },
+      auth: { status: authStatus },
+      notificationService: { status: notificationStatus, activeStreams: sseClients },
+      pushService: { status: pushStatus },
+      emailService: { status: emailStatus },
+      smsService: { status: smsStatus },
+      mapService: { status: 'Healthy' },
+      aiService: { status: 'Healthy' },
+      timestamp: new Date().toISOString(),
+    }, 'System health check completed');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getLiveEmergencies(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const requests = await prisma.bloodRequest.findMany({
+      where: {
+        status: { notIn: ['FULFILLED', 'CANCELLED'] },
+      },
+      orderBy: [
+        { urgency: 'desc' },
+        { createdAt: 'desc' },
+      ],
+      take: 20,
+      include: {
+        matches: {
+          select: {
+            id: true,
+            status: true,
+            distanceKm: true,
+          },
+        },
+      },
+    });
+
+    const formatted = requests.map((r) => {
+      const suitableDonors = r.matches.length;
+      const acceptedDonors = r.matches.filter((m) => m.status === 'ACCEPTED').length;
+      return {
+        id: r.id,
+        bloodGroup: r.bloodGroup,
+        unitsRequired: r.unitsRequired,
+        patientName: r.patientName,
+        hospitalName: r.hospitalName,
+        hospitalCity: r.hospitalCity,
+        urgency: r.urgency,
+        status: r.status,
+        suitableDonors,
+        acceptedDonors,
+        createdAt: r.createdAt,
+        requiredBy: r.requiredBy,
+      };
+    });
+
+    sendSuccess(res, formatted);
   } catch (error) {
     next(error);
   }

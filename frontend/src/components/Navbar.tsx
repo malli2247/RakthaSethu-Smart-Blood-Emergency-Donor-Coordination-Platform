@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -7,19 +7,18 @@ import {
   AlertCircle,
   Menu,
   X,
-  User as UserIcon,
   LogOut,
-  Bell,
   Activity,
-  ShieldAlert,
   Globe,
+  LayoutDashboard,
 } from 'lucide-react';
 import { NotificationDropdown } from './notifications/NotificationDropdown';
 import { useLanguage } from '../contexts/LanguageContext';
+import { LanguageSelector } from './LanguageSelector';
 
 export const Navbar: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,6 +37,7 @@ export const Navbar: React.FC = () => {
         return '/bloodbank/dashboard';
       case 'VOLUNTEER':
         return '/volunteer/dashboard';
+      case 'SUPER_ADMIN':
       case 'ADMIN':
         return '/admin/dashboard';
       default:
@@ -54,8 +54,8 @@ export const Navbar: React.FC = () => {
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Brand Logo */}
-          <Link to="/" className="flex items-center gap-2.5">
+          {/* Brand Logo - clicks through to public homepage */}
+          <Link to="/" className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-rose-500 rounded-xl p-1">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 flex items-center justify-center text-white shadow-md shadow-rose-200">
               <Droplets className="w-6 h-6 fill-white text-white" />
             </div>
@@ -64,7 +64,7 @@ export const Navbar: React.FC = () => {
                 Raktha<span className="text-rose-600">Sethu</span>
               </span>
               <span className="block text-[10px] uppercase font-bold text-rose-600 tracking-wider -mt-1">
-                Emergency Blood Connect
+                {t('appTagline')}
               </span>
             </div>
           </Link>
@@ -77,7 +77,7 @@ export const Navbar: React.FC = () => {
                 location.pathname === '/find-blood' ? 'text-rose-600 font-bold' : ''
               }`}
             >
-              Find Blood
+              {t('findBlood')}
             </Link>
             <Link
               to="/compatibility"
@@ -85,7 +85,7 @@ export const Navbar: React.FC = () => {
                 location.pathname === '/compatibility' ? 'text-rose-600 font-bold' : ''
               }`}
             >
-              Compatibility Matrix
+              {t('compatibility')}
             </Link>
             <Link
               to="/campaigns"
@@ -93,7 +93,7 @@ export const Navbar: React.FC = () => {
                 location.pathname === '/campaigns' ? 'text-rose-600 font-bold' : ''
               }`}
             >
-              Donation Camps
+              {t('campaigns')}
             </Link>
             <Link
               to="/how-it-works"
@@ -101,7 +101,7 @@ export const Navbar: React.FC = () => {
                 location.pathname === '/how-it-works' ? 'text-rose-600 font-bold' : ''
               }`}
             >
-              How It Works
+              {t('howItWorks')}
             </Link>
             <Link
               to="/faq"
@@ -109,52 +109,45 @@ export const Navbar: React.FC = () => {
                 location.pathname === '/faq' ? 'text-rose-600 font-bold' : ''
               }`}
             >
-              FAQ
+              {t('faq')}
             </Link>
           </nav>
 
           {/* Action CTAs */}
           <div className="hidden lg:flex items-center gap-3">
-            {/* Language Switcher */}
-            <button
-              onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border border-slate-200 text-slate-700 hover:bg-slate-50 transition"
-              title="Change Language"
-            >
-              <Globe className="w-3.5 h-3.5 text-slate-500" />
-              <span>{language === 'en' ? 'हिन्दी' : 'English'}</span>
-            </button>
+            {/* Universal 11 Indian Languages Dropdown */}
+            <LanguageSelector variant="header" />
 
             {/* Emergency Request Button */}
             <Link
               to="/patient/create-request"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200 transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm shadow-rose-200 transition-colors"
             >
               <AlertCircle className="w-4 h-4 animate-bounce" />
-              Need Blood?
+              {t('needBloodNow')}
             </Link>
 
             {isAuthenticated ? (
               <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
                 <Link
                   to={getDashboardPath()}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors"
                 >
-                  <Activity className="w-4 h-4 text-rose-600" />
-                  Dashboard
+                  <LayoutDashboard className="w-4 h-4 text-rose-600" />
+                  {t('dashboard')}
                 </Link>
 
                 <NotificationDropdown />
 
                 <div className="relative">
-                  <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 font-bold text-xs border border-rose-200">
-                    {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'ME'}
+                  <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 font-bold text-xs border border-rose-200" title={user?.email}>
+                    {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : user?.email?.slice(0, 2).toUpperCase()}
                   </div>
                 </div>
 
                 <button
                   onClick={handleLogout}
-                  title="Logout"
+                  title={t('signOut')}
                   className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
                 >
                   <LogOut className="w-4 h-4" />
@@ -164,33 +157,39 @@ export const Navbar: React.FC = () => {
               <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
                 <Link
                   to="/register?role=DONOR"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-rose-700 hover:bg-rose-50 border border-rose-200 transition-colors"
                 >
                   <Heart className="w-4 h-4 text-rose-600 fill-rose-500" />
-                  Donate Blood
+                  {t('becomeDonor')}
                 </Link>
                 <Link
                   to="/login"
-                  className="px-3 py-1.5 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  className="px-3 py-1.5 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-100 transition-colors"
                 >
-                  Sign In
+                  {t('signIn')}
                 </Link>
               </div>
             )}
           </div>
 
-          {/* Mobile menu toggle */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Mobile menu toggle & quick CTA */}
+          <div className="flex lg:hidden items-center gap-2">
+            <LanguageSelector variant="header" />
+
             <Link
               to="/patient/create-request"
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-600 text-white flex items-center gap-1"
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white flex items-center gap-1 shadow-sm"
             >
               <AlertCircle className="w-3.5 h-3.5" />
-              Need Blood
+              <span className="hidden sm:inline">{t('needBloodNow')}</span>
             </Link>
+
+            {isAuthenticated && <NotificationDropdown />}
+
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100"
+              className="p-2 text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 focus:outline-none"
+              aria-label="Toggle menu"
             >
               {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -200,90 +199,93 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-slate-200 bg-white px-4 pt-2 pb-6 space-y-3">
-          <Link
-            to="/find-blood"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 hover:text-rose-600"
-          >
-            Find Blood
-          </Link>
-          <Link
-            to="/compatibility"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 hover:text-rose-600"
-          >
-            Compatibility Matrix
-          </Link>
-          <Link
-            to="/campaigns"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 hover:text-rose-600"
-          >
-            Donation Camps
-          </Link>
-          <Link
-            to="/how-it-works"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 hover:text-rose-600"
-          >
-            How It Works
-          </Link>
-          <Link
-            to="/faq"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 text-base font-medium text-slate-700 hover:text-rose-600"
-          >
-            FAQ
-          </Link>
+        <div className="lg:hidden border-b border-slate-200 bg-white px-4 pt-3 pb-6 space-y-4 animate-in slide-in-from-top-2">
+          {isAuthenticated && (
+            <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold text-slate-900">{user?.displayName || user?.email}</p>
+                <span className="inline-block text-[10px] uppercase font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                  {user?.role}
+                </span>
+              </div>
+              <Link
+                to={getDashboardPath()}
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-1.5 text-xs font-bold bg-rose-600 text-white rounded-lg"
+              >
+                {t('dashboard')}
+              </Link>
+            </div>
+          )}
 
-          <div className="pt-4 border-t border-slate-100 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setLanguage(language === 'en' ? 'hi' : 'en');
-                setMobileMenuOpen(false);
-              }}
-              className="w-full py-2 px-3 text-center rounded-lg border border-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-2"
+          <nav className="space-y-1">
+            <Link
+              to="/find-blood"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-slate-700 hover:text-rose-600"
             >
-              <Globe className="w-4 h-4 text-slate-500" />
-              <span>Switch Language: {language === 'en' ? 'हिन्दी' : 'English'}</span>
-            </button>
-            {isAuthenticated ? (
-              <>
-                <Link
-                  to={getDashboardPath()}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="w-full py-2.5 px-4 text-center rounded-lg bg-slate-900 text-white font-semibold text-sm"
-                >
-                  My Dashboard ({user?.role})
-                </Link>
-                <button
-                  onClick={() => {
-                    handleLogout();
-                    setMobileMenuOpen(false);
-                  }}
-                  className="w-full py-2 px-4 text-center rounded-lg border border-slate-200 text-slate-700 font-semibold text-sm"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
-              <>
+              {t('findBlood')}
+            </Link>
+            <Link
+              to="/compatibility"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-slate-700 hover:text-rose-600"
+            >
+              {t('compatibility')}
+            </Link>
+            <Link
+              to="/campaigns"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-slate-700 hover:text-rose-600"
+            >
+              {t('campaigns')}
+            </Link>
+            <Link
+              to="/how-it-works"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-slate-700 hover:text-rose-600"
+            >
+              {t('howItWorks')}
+            </Link>
+            <Link
+              to="/faq"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 text-sm font-semibold text-slate-700 hover:text-rose-600"
+            >
+              {t('faq')}
+            </Link>
+          </nav>
+
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <LanguageSelector variant="drawer" />
+
+            {!isAuthenticated ? (
+              <div className="grid grid-cols-2 gap-2 pt-2">
                 <Link
                   to="/register?role=DONOR"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full py-2.5 px-4 text-center rounded-lg bg-rose-600 text-white font-semibold text-sm"
+                  className="py-2.5 text-center rounded-xl bg-rose-50 text-rose-700 font-bold text-xs border border-rose-200"
                 >
-                  Become a Blood Donor
+                  {t('becomeDonor')}
                 </Link>
                 <Link
                   to="/login"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full py-2 px-4 text-center rounded-lg border border-slate-200 text-slate-700 font-semibold text-sm"
+                  className="py-2.5 text-center rounded-xl bg-slate-900 text-white font-bold text-xs"
                 >
-                  Sign In
+                  {t('signIn')}
                 </Link>
-              </>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  handleLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2.5 text-center rounded-xl border border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50"
+              >
+                {t('signOut')}
+              </button>
             )}
           </div>
         </div>

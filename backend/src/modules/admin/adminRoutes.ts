@@ -9,6 +9,8 @@ import {
   getAuditLogs,
   getStuckRequests,
   resolveRequestIssue,
+  getSystemHealth,
+  getLiveEmergencies,
 } from './adminController';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -18,6 +20,8 @@ adminRouter.use(authenticateToken);
 adminRouter.use(requireRole('ADMIN'));
 
 adminRouter.get('/stats', getAdminStats);
+adminRouter.get('/system-health', getSystemHealth);
+adminRouter.get('/live-emergencies', getLiveEmergencies);
 adminRouter.get('/users', listAllUsers);
 adminRouter.get('/users/:id', getUserById);
 adminRouter.patch('/users/:id/status', updateUserStatus);

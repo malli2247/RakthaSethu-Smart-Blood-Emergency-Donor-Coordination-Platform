@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { donorApi, requestsApi } from '../../services/api';
 import { BloodGroupBadge } from '../../components/BloodGroupBadge';
@@ -15,7 +15,10 @@ import {
   Clock,
   MapPin,
   Sparkles,
+  Phone,
+  ShieldAlert,
 } from 'lucide-react';
+import { OtpVerificationModal } from '../../components/auth/OtpVerificationModal';
 
 export const DonorDashboard: React.FC = () => {
   const [profile, setProfile] = useState<any>(null);
@@ -23,6 +26,7 @@ export const DonorDashboard: React.FC = () => {
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
 
   const loadData = async () => {
     try {
@@ -132,6 +136,29 @@ export const DonorDashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Mobile Verification Alert Banner */}
+      {!profile?.user?.isVerified && (
+        <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-amber-900">Mobile Number Verification Required</h3>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Verify your mobile number to receive real-time blood request alerts and participate in active donor matching.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setOtpModalOpen(true)}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors shadow-sm"
+          >
+            Verify Mobile via OTP
+          </button>
+        </div>
+      )}
 
       {actionMessage && (
         <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
@@ -277,6 +304,17 @@ export const DonorDashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      <OtpVerificationModal
+        phone={profile?.user?.phone || ''}
+        isOpen={otpModalOpen}
+        onClose={() => setOtpModalOpen(false)}
+        onVerified={() => {
+          loadData();
+          setActionMessage('Mobile number verified! You are now eligible for active donor matching.');
+          setTimeout(() => setActionMessage(null), 4000);
+        }}
+      />
     </div>
   );
 };
