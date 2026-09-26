@@ -161,4 +161,11 @@ export class RealtimeNotificationService {
       totalConnections,
     };
   }
+
+  /**
+   * Return total count of active SSE subscribers
+   */
+  static getActiveSubscribersCount(): number {
+    return this.getStats().totalConnections;
+  }
 }

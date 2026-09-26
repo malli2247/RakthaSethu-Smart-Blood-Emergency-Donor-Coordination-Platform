@@ -43,7 +43,7 @@ export class OtpService {
     phone: string,
     userId?: string,
     ipAddress?: string
-  ): Promise<{ success: boolean; message: string; cooldownSeconds: number; expiresInSeconds: number }> {
+  ): Promise<{ success: boolean; unconfigured?: boolean; message: string; cooldownSeconds: number; expiresInSeconds: number }> {
     const cleanPhone = phone.trim().replace(/\s+/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
       throw new Error('Please provide a valid 10-digit mobile number');

@@ -299,7 +299,7 @@ export class CampService {
     // Distance-based filtering
     let activeRadius = radiusKm;
     let inRadius = processed.filter(
-      (c) => c.distanceKm !== null && c.distanceKm <= activeRadius
+      (c) => c.distanceKm != null && c.distanceKm <= activeRadius
     );
     let expanded = false;
     let expansionMessage: string | null = null;
@@ -311,7 +311,7 @@ export class CampService {
       const tiers = [50, 100].filter((t) => t > radiusKm);
       for (const tier of tiers) {
         const tierMatches = processed.filter(
-          (c) => c.distanceKm !== null && c.distanceKm <= tier
+          (c) => c.distanceKm != null && c.distanceKm <= tier
         );
         if (tierMatches.length > 0) {
           activeRadius = tier;
@@ -604,7 +604,7 @@ export class CampService {
           message: `Join "${camp.campName}" at ${camp.venue} on ${new Date(camp.campDate).toLocaleDateString()}. Save lives in your neighborhood!`,
           type: 'SYSTEM_NOTICE',
           priority: 'NORMAL',
-          category: 'CAMPAIGN',
+          category: 'SYSTEM',
           actionUrl: `/campaigns`,
         });
       }

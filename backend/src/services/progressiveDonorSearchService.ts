@@ -480,7 +480,6 @@ export class ProgressiveDonorSearchService {
 
       // Emit candidate_count_updated
       this.emitEvent(job, 'candidate_count_updated', {
-        radiusKm: currentRadius,
         ...radiusMetric,
       });
 
