@@ -8,7 +8,17 @@ export async function createRequest(req: Request, res: Response, next: NextFunct
     const requesterId = req.user!.id;
     const request = await RequestService.createRequest(requesterId, req.body);
     CacheService.invalidateByTag('stats');
-    sendSuccess(res, request, 'Emergency blood request created and matching started', 201);
+    sendSuccess(
+      res,
+      {
+        ...request,
+        requestId: request.id,
+        status: request.status,
+        createdAt: request.createdAt,
+      },
+      'Emergency blood request created and matching started',
+      201
+    );
   } catch (error) {
     next(error);
   }

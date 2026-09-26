@@ -20,6 +20,8 @@ export const notificationRouter = Router();
 
 // VAPID public key discovery
 notificationRouter.get('/vapid-public-key', getVapidPublicKey);
+notificationRouter.get('/push/public-key', getVapidPublicKey);
+notificationRouter.get('/push-subscription/vapid-key', getVapidPublicKey);
 
 // Real-time SSE stream endpoint (authenticates via query parameter ?token= or Authorization header)
 notificationRouter.get('/stream', optionalAuth, streamNotifications);
@@ -30,9 +32,12 @@ notificationRouter.post('/track-click', trackNotificationClick);
 // Protected REST endpoints
 notificationRouter.use(authenticateToken);
 
-// Push subscription management
+// Push subscription management (with standard and canonical aliases)
 notificationRouter.post('/push-subscription', registerPushSubscription);
 notificationRouter.delete('/push-subscription', revokePushSubscription);
+notificationRouter.post('/push/subscribe', registerPushSubscription);
+notificationRouter.delete('/push/subscribe', revokePushSubscription);
+notificationRouter.post('/push/unsubscribe', revokePushSubscription);
 notificationRouter.post('/test-push', sendTestPush);
 
 // User notification preferences

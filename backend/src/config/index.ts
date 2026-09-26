@@ -130,11 +130,120 @@ if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = config.databaseUrl;
 }
 
+export type ConfigStatus = 'CONFIGURED' | 'MISSING' | 'INVALID';
+
+/**
+ * Evaluates environment configuration integrity safely without revealing secret values.
+ */
+export function checkProductionEnvironment(): Record<string, ConfigStatus> {
+  const insecureDevJwtPatterns = ['dev', 'change_in_prod', '1234567890', '0987654321'];
+
+  // DATABASE_URL
+  let dbStatus: ConfigStatus = 'MISSING';
+  if (config.databaseUrl) {
+    if (
+      config.databaseUrl.startsWith('postgresql://') ||
+      config.databaseUrl.startsWith('postgres://') ||
+      config.databaseUrl.startsWith('file:')
+    ) {
+      dbStatus = 'CONFIGURED';
+    } else {
+      dbStatus = 'INVALID';
+    }
+  }
+
+  // JWT ACCESS SECRET
+  let jwtAccessStatus: ConfigStatus = 'MISSING';
+  if (config.jwt.accessSecret) {
+    if (
+      (config.isProduction && insecureDevJwtPatterns.some((p) => config.jwt.accessSecret.toLowerCase().includes(p))) ||
+      config.jwt.accessSecret.length < 16
+    ) {
+      jwtAccessStatus = 'INVALID';
+    } else {
+      jwtAccessStatus = 'CONFIGURED';
+    }
+  }
+
+  // JWT REFRESH SECRET
+  let jwtRefreshStatus: ConfigStatus = 'MISSING';
+  if (config.jwt.refreshSecret) {
+    if (
+      (config.isProduction && insecureDevJwtPatterns.some((p) => config.jwt.refreshSecret.toLowerCase().includes(p))) ||
+      config.jwt.refreshSecret.length < 16
+    ) {
+      jwtRefreshStatus = 'INVALID';
+    } else {
+      jwtRefreshStatus = 'CONFIGURED';
+    }
+  }
+
+  // VAPID KEYS
+  let vapidPublicStatus: ConfigStatus = 'MISSING';
+  if (config.push.vapidPublicKey) {
+    vapidPublicStatus = config.push.vapidPublicKey.length >= 60 ? 'CONFIGURED' : 'INVALID';
+  }
+
+  let vapidPrivateStatus: ConfigStatus = 'MISSING';
+  if (config.push.vapidPrivateKey) {
+    vapidPrivateStatus = config.push.vapidPrivateKey.length >= 30 ? 'CONFIGURED' : 'INVALID';
+  }
+
+  let vapidSubjectStatus: ConfigStatus = 'MISSING';
+  if (config.push.vapidSubject) {
+    vapidSubjectStatus =
+      config.push.vapidSubject.startsWith('mailto:') || config.push.vapidSubject.startsWith('http')
+        ? 'CONFIGURED'
+        : 'INVALID';
+  }
+
+  // SMS PROVIDER
+  let smsStatus: ConfigStatus = 'MISSING';
+  if (config.sms.provider === 'twilio') {
+    smsStatus =
+      config.sms.twilioAccountSid && config.sms.twilioAuthToken && config.sms.twilioPhoneNumber
+        ? 'CONFIGURED'
+        : 'MISSING';
+  } else if (config.sms.provider === 'mock') {
+    smsStatus = config.isProduction && process.env.OTP_DEV_MODE !== 'true' ? 'INVALID' : 'CONFIGURED';
+  }
+
+  // EMAIL PROVIDER
+  let emailStatus: ConfigStatus = 'MISSING';
+  if (config.email.provider === 'smtp') {
+    emailStatus = config.email.smtpUser && config.email.smtpPass ? 'CONFIGURED' : 'MISSING';
+  } else if (config.email.provider === 'mock') {
+    emailStatus = 'CONFIGURED';
+  }
+
+  // CORS
+  const corsStatus: ConfigStatus = config.corsOrigins.length > 0 ? 'CONFIGURED' : 'MISSING';
+
+  return {
+    DATABASE_URL: dbStatus,
+    JWT_ACCESS_SECRET: jwtAccessStatus,
+    JWT_REFRESH_SECRET: jwtRefreshStatus,
+    VAPID_PUBLIC_KEY: vapidPublicStatus,
+    VAPID_PRIVATE_KEY: vapidPrivateStatus,
+    VAPID_SUBJECT: vapidSubjectStatus,
+    SMS_PROVIDER: smsStatus,
+    EMAIL_PROVIDER: emailStatus,
+    CORS_ORIGINS: corsStatus,
+  };
+}
+
 /**
  * Startup sanity check and environment validator.
  * Warns on unconfigured optional services and prevents insecure production boot.
  */
 export function validateEnvironment(): void {
+  const sanityReport = checkProductionEnvironment();
+  logger.info('[Config Sanity] Safe Configuration Status Check:');
+  for (const [key, status] of Object.entries(sanityReport)) {
+    const symbol = status === 'CONFIGURED' ? '✅' : status === 'INVALID' ? '❌' : '⚠️';
+    logger.info(`  ${symbol} ${key.padEnd(20)}: ${status}`);
+  }
+
   if (config.isProduction) {
     // Critical security assertions in production
     const insecureDevJwtPatterns = ['dev', 'change_in_prod', '1234567890'];

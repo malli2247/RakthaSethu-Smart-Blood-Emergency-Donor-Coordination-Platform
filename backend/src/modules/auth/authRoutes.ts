@@ -11,6 +11,7 @@ import {
   verifyEmail,
   sendOtp,
   verifyOtp,
+  resendOtp,
 } from './authController';
 import { validate } from '../../middleware/validate';
 import {
@@ -59,4 +60,11 @@ authRouter.post(
 // Mobile OTP Verification Endpoints
 authRouter.post('/otp/send', authLimiter, optionalAuth, sendOtp);
 authRouter.post('/otp/verify', authLimiter, optionalAuth, verifyOtp);
+authRouter.post('/otp/resend', authLimiter, optionalAuth, resendOtp);
+
+// Standalone OTP Router for /api/otp alias
+export const otpRouter = Router();
+otpRouter.post('/send', authLimiter, optionalAuth, sendOtp);
+otpRouter.post('/verify', authLimiter, optionalAuth, verifyOtp);
+otpRouter.post('/resend', authLimiter, optionalAuth, resendOtp);
 

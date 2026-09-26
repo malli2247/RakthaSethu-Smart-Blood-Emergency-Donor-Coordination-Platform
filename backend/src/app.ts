@@ -7,7 +7,7 @@ import { generalLimiter } from './middleware/rateLimiter';
 import { AppError, sendSuccess } from './utils/response';
 
 // Import route modules
-import { authRouter } from './modules/auth/authRoutes';
+import { authRouter, otpRouter } from './modules/auth/authRoutes';
 import { matchingRouter } from './modules/matching/matchingRoutes';
 import { requestRouter } from './modules/requests/requestRoutes';
 import { donorRouter } from './modules/donors/donorRoutes';
@@ -153,6 +153,7 @@ export function createApp(): Express {
 
   // Mount API modules
   app.use('/api/auth', authRouter);
+  app.use('/api/otp', otpRouter);
   app.use('/api/matching', matchingRouter);
   app.use('/api/requests', requestRouter);
   app.use('/api/blood-requests', requestRouter);

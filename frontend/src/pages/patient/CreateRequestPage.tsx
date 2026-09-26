@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { requestsApi, aiApi } from '../../services/api';
 import { BloodGroup, UrgencyLevel } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
 import {
   AlertCircle,
   Clock,
@@ -19,6 +20,10 @@ import {
   Activity,
   Droplet,
   Compass,
+  Lock,
+  LogIn,
+  Save,
+  Check,
 } from 'lucide-react';
 import { VoiceRequestModal } from '../../components/emergency/VoiceRequestModal';
 
@@ -77,6 +82,89 @@ export const CreateRequestPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
 
+  // Authentication & Draft persistence state
+  const { isAuthenticated, user } = useAuth();
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftSavedToast, setDraftSavedToast] = useState(false);
+
+  // Restore draft from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('rakthasethu_request_draft');
+      if (saved) {
+        const d = JSON.parse(saved);
+        if (d.bloodGroup) setBloodGroup(d.bloodGroup);
+        if (d.unitsRequired) setUnitsRequired(Number(d.unitsRequired));
+        if (d.urgency) setUrgency(d.urgency);
+        if (d.medicalReason) setMedicalReason(d.medicalReason);
+        if (d.hospitalName) setHospitalName(d.hospitalName);
+        if (d.requiredBy) setRequiredBy(d.requiredBy);
+        if (d.hospitalCity) setHospitalCity(d.hospitalCity);
+        if (d.hospitalState) setHospitalState(d.hospitalState);
+        if (d.hospitalAddress) setHospitalAddress(d.hospitalAddress);
+        if (d.patientName) setPatientName(d.patientName);
+        if (d.patientAge) setPatientAge(Number(d.patientAge));
+        if (d.patientGender) setPatientGender(d.patientGender);
+        if (d.contactName) setContactName(d.contactName);
+        if (d.contactPhone) setContactPhone(d.contactPhone);
+        if (d.additionalNotes) setAdditionalNotes(d.additionalNotes);
+        if (d.currentStep && d.currentStep >= 1 && d.currentStep <= 7) {
+          setCurrentStep(d.currentStep);
+        }
+        setDraftRestored(true);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }, []);
+
+  const saveDraft = useCallback((overrideStep?: number) => {
+    try {
+      const draft = {
+        bloodGroup,
+        unitsRequired,
+        urgency,
+        medicalReason,
+        hospitalName,
+        requiredBy,
+        hospitalCity,
+        hospitalState,
+        hospitalAddress,
+        patientName,
+        patientAge,
+        patientGender,
+        contactName,
+        contactPhone,
+        additionalNotes,
+        currentStep: overrideStep ?? currentStep,
+        savedAt: new Date().toISOString(),
+      };
+      localStorage.setItem('rakthasethu_request_draft', JSON.stringify(draft));
+      setDraftSavedToast(true);
+      setTimeout(() => setDraftSavedToast(false), 2500);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [
+    bloodGroup,
+    unitsRequired,
+    urgency,
+    medicalReason,
+    hospitalName,
+    requiredBy,
+    hospitalCity,
+    hospitalState,
+    hospitalAddress,
+    patientName,
+    patientAge,
+    patientGender,
+    contactName,
+    contactPhone,
+    additionalNotes,
+    currentStep,
+  ]);
+
   // Progressive Search Animation State after submission
   const [searchRadiusIndex, setSearchRadiusIndex] = useState(0);
   const [isSearchingNearby, setIsSearchingNearby] = useState(false);
@@ -93,6 +181,7 @@ export const CreateRequestPage: React.FC = () => {
     if (extracted.hospitalName) setHospitalName(extracted.hospitalName);
     if (extracted.urgency) setUrgency(extracted.urgency as UrgencyLevel);
     setVoiceModalOpen(false);
+    saveDraft();
   };
 
   const handleAiTriage = async () => {
@@ -162,19 +251,33 @@ export const CreateRequestPage: React.FC = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 7));
+      const next = Math.min(currentStep + 1, 7);
+      setCurrentStep(next);
+      saveDraft(next);
     }
   };
 
   const prevStep = () => {
     setError(null);
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
+    const prev = Math.max(currentStep - 1, 1);
+    setCurrentStep(prev);
+    saveDraft(prev);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep(6)) return;
     setError(null);
+
+    // Save draft state
+    saveDraft(7);
+
+    // Strict authentication verification: do not broadcast without Bearer token
+    if (!isAuthenticated) {
+      setAuthModalOpen(true);
+      return;
+    }
+
     setSubmitting(true);
     setIsSearchingNearby(true);
 
@@ -182,28 +285,31 @@ export const CreateRequestPage: React.FC = () => {
       // Simulate real-time progressive radius search animation
       for (let i = 0; i < 3; i++) {
         setSearchRadiusIndex(i);
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 400));
       }
 
       const res = await requestsApi.create({
-        patientName,
-        patientAge: Number(patientAge),
-        patientGender,
+        patientName: patientName.trim(),
+        patientAge: patientAge ? Number(patientAge) : undefined,
+        patientGender: patientGender || undefined,
         bloodGroup,
         unitsRequired: Number(unitsRequired),
-        hospitalName,
-        hospitalCity,
-        hospitalState,
-        hospitalAddress,
+        hospitalName: hospitalName.trim(),
+        hospitalCity: hospitalCity.trim(),
+        hospitalState: hospitalState.trim(),
+        hospitalAddress: hospitalAddress.trim(),
         requiredBy: new Date(requiredBy).toISOString(),
         urgency,
-        medicalReason,
-        contactName,
-        contactPhone,
-        additionalNotes,
+        medicalReason: medicalReason.trim() || undefined,
+        contactName: contactName.trim(),
+        contactPhone: contactPhone.trim(),
+        additionalNotes: additionalNotes.trim() || undefined,
       });
 
-      const newRequestId = res.data?.data?.id;
+      // Clear draft on successful broadcast
+      localStorage.removeItem('rakthasethu_request_draft');
+
+      const newRequestId = res.data?.data?.requestId || res.data?.data?.id || res.data?.requestId || res.data?.id;
       navigate(`/patient/requests/${newRequestId}`);
     } catch (err: any) {
       setIsSearchingNearby(false);
@@ -239,6 +345,32 @@ export const CreateRequestPage: React.FC = () => {
           Step-by-step verified emergency dispatch. Our matching engine alerts qualified voluntary
           donors progressively across expanding radius tiers.
         </p>
+
+        {draftSavedToast && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-full shadow-xs">
+            <Check className="w-3.5 h-3.5" />
+            <span>Emergency draft auto-saved</span>
+          </div>
+        )}
+
+        {!isAuthenticated && (
+          <div className="flex items-start sm:items-center justify-between gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-left text-xs text-amber-800">
+            <div className="flex items-center gap-2.5">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                <strong>Guest Mode:</strong> You can prepare this requisition now. You will be prompted to sign in before broadcast. Your draft is safely auto-saved.
+              </span>
+            </div>
+            <Link
+              to="/login?redirect=/patient/create-request"
+              onClick={() => saveDraft()}
+              className="inline-flex items-center gap-1 font-bold text-amber-900 underline hover:text-amber-700 whitespace-nowrap"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Progress Stepper Bar */}
@@ -733,6 +865,18 @@ export const CreateRequestPage: React.FC = () => {
                 RakthaSethu's real-time statistics only as a genuine database record.
               </p>
             </div>
+
+            {!isAuthenticated && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-900 flex items-start gap-3">
+                <Lock className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-rose-800">Authentication Required to Broadcast Request</div>
+                  <p className="text-rose-700 leading-relaxed">
+                    Emergency broadcasts dispatch notifications directly to verified blood donors and hospitals. You need to be signed in to confirm and broadcast. Clicking "Confirm & Broadcast Request" will prompt you to log in with your draft preserved.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -819,6 +963,61 @@ export const CreateRequestPage: React.FC = () => {
         onClose={() => setVoiceModalOpen(false)}
         onConfirmExtracted={handleVoiceExtracted}
       />
+
+      {/* Authentication Required Modal */}
+      {authModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 text-center space-y-5 shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">Sign In to Broadcast Request</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Emergency requisitions must be authenticated to prevent counterfeit alerts and protect donors. Your draft for{' '}
+                <strong>
+                  {patientName || 'Patient'} ({unitsRequired} unit(s) of {bloodGroup.replace('_POSITIVE', '+').replace('_NEGATIVE', '-')})
+                </strong>{' '}
+                has been safely saved.
+              </p>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  saveDraft(7);
+                  navigate('/login?redirect=/patient/create-request');
+                }}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md shadow-rose-600/20 transition cursor-pointer"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Sign In & Continue Requisition</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  saveDraft(7);
+                  navigate('/register?redirect=/patient/create-request');
+                }}
+                className="w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-800 font-bold text-sm transition cursor-pointer"
+              >
+                <span>Create New Account</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAuthModalOpen(false)}
+                className="w-full text-xs text-slate-400 hover:text-slate-600 py-1 transition cursor-pointer"
+              >
+                Return to Review Form
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

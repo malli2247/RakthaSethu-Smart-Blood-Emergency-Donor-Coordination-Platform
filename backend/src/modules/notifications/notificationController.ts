@@ -180,7 +180,18 @@ export async function streamNotifications(req: Request, res: Response): Promise<
  * Returns VAPID public key for frontend subscription
  */
 export async function getVapidPublicKey(req: Request, res: Response): Promise<void> {
-  sendSuccess(res, { publicKey: config.push.vapidPublicKey });
+  const publicKey = config.push.vapidPublicKey || '';
+  if (!publicKey) {
+    res.status(503).json({
+      success: false,
+      message: 'VAPID public key is missing on the server.',
+    });
+    return;
+  }
+  sendSuccess(res, {
+    publicKey,
+    vapidPublicKey: publicKey,
+  });
 }
 
 /**

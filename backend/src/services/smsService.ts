@@ -7,6 +7,10 @@ export class SmsService {
    */
   static async sendSms(to: string, message: string): Promise<{ success: boolean; unconfigured?: boolean; simulated?: boolean }> {
     if (config.sms.provider === 'mock') {
+      if (process.env.NODE_ENV === 'production' && process.env.OTP_DEV_MODE !== 'true') {
+        logger.warn('[SMS Service] SMS provider is mock in production without OTP_DEV_MODE=true. Refusing to mock SMS delivery.');
+        return { success: false, unconfigured: true };
+      }
       const maskedPhone = to.length > 5 ? `${to.slice(0, 3)}****${to.slice(-2)}` : to;
       logger.info(`[SMS Service - Simulated Mode] To: ${maskedPhone} | Length: ${message.length} chars`);
       return { success: true, simulated: true };

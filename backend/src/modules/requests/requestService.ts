@@ -6,6 +6,7 @@ import { NotificationService } from '../../services/notificationService';
 import { EmailService } from '../../services/emailService';
 
 export const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ['PENDING', 'VALIDATING', 'MATCHING', 'CANCELLED'],
   PENDING: ['VALIDATING', 'MATCHING', 'CANCELLED', 'REJECTED', 'EXPIRED'],
   VALIDATING: ['MATCHING', 'REJECTED', 'CANCELLED'],
   MATCHING: ['DONORS_FOUND', 'DONOR_CONTACTED', 'DONOR_ACCEPTED', 'UNABLE_TO_FULFILL', 'CANCELLED', 'EXPIRED'],

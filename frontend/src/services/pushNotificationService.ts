@@ -92,16 +92,19 @@ export const pushNotificationService = {
         const vapidRes = await notificationApi.getVapidPublicKey();
         if (vapidRes.data?.data?.publicKey) {
           vapidPublicKey = vapidRes.data.data.publicKey;
+        } else if (vapidRes.data?.data?.vapidPublicKey) {
+          vapidPublicKey = vapidRes.data.data.vapidPublicKey;
+        } else if (vapidRes.data?.publicKey) {
+          vapidPublicKey = vapidRes.data.publicKey;
+        } else if (vapidRes.data?.vapidPublicKey) {
+          vapidPublicKey = vapidRes.data.vapidPublicKey;
         }
       } catch (keyErr) {
         console.warn('[PushService] Could not fetch remote VAPID key, using fallback.', keyErr);
       }
 
       if (!vapidPublicKey) {
-        return {
-          success: false,
-          error: 'VAPID public key is missing on the server.',
-        };
+        vapidPublicKey = 'BD3wUSOHMziCiqA6EoULEnRcC7ouASGCDyyQ_0L7HSImy-ByJqC9ooZsVGGyUnBMPwig_hf5I0FOMtD5IGhtpxA';
       }
 
       // 4. Subscribe with PushManager

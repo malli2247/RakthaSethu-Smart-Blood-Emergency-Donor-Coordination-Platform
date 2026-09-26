@@ -20,7 +20,11 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('rakthasethu_token');
   if (token && config.headers) {
-    config.headers.Authorization = `Bearer ${token}`;
+    if (typeof config.headers.set === 'function') {
+      config.headers.set('Authorization', `Bearer ${token}`);
+    } else {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
   }
   return config;
 });
@@ -30,7 +34,7 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem('rakthasethu_refresh_token');
       if (refreshToken) {
@@ -38,12 +42,19 @@ api.interceptors.response.use(
           const { data } = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
             refreshToken,
           });
-          if (data.data?.accessToken) {
-            localStorage.setItem('rakthasethu_token', data.data.accessToken);
-            if (data.data.refreshToken) {
+          const newAccess = data.data?.accessToken;
+          if (newAccess) {
+            localStorage.setItem('rakthasethu_token', newAccess);
+            if (data.data?.refreshToken) {
               localStorage.setItem('rakthasethu_refresh_token', data.data.refreshToken);
             }
-            originalRequest.headers.Authorization = `Bearer ${data.data.accessToken}`;
+            if (originalRequest.headers) {
+              if (typeof originalRequest.headers.set === 'function') {
+                originalRequest.headers.set('Authorization', `Bearer ${newAccess}`);
+              } else {
+                originalRequest.headers['Authorization'] = `Bearer ${newAccess}`;
+              }
+            }
             return api(originalRequest);
           }
         } catch {
@@ -51,6 +62,13 @@ api.interceptors.response.use(
           localStorage.removeItem('rakthasethu_token');
           localStorage.removeItem('rakthasethu_refresh_token');
           localStorage.removeItem('rakthasethu_user');
+          if (typeof window !== 'undefined') {
+            const currentPath = window.location.pathname;
+            const isAuthOrHome = ['/login', '/register', '/forgot-password', '/reset-password', '/'].includes(currentPath);
+            if (!isAuthOrHome) {
+              window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+            }
+          }
         }
       }
     }
@@ -69,6 +87,7 @@ export const authApi = {
   resetPassword: (data: { token: string; newPassword: string }) => api.post('/auth/reset-password', data),
   sendOtp: (phone: string) => api.post('/auth/otp/send', { phone }),
   verifyOtp: (phone: string, otp: string) => api.post('/auth/otp/verify', { phone, otp }),
+  resendOtp: (phone: string) => api.post('/auth/otp/resend', { phone }),
 };
 
 export const matchingApi = {

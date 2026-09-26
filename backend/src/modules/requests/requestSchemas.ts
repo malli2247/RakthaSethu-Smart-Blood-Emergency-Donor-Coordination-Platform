@@ -14,6 +14,7 @@ const BloodGroupEnum = z.enum([
 const UrgencyEnum = z.enum(['NORMAL', 'HIGH', 'CRITICAL']);
 
 const RequestStatusEnum = z.enum([
+  'DRAFT',
   'PENDING',
   'VALIDATING',
   'MATCHING',

@@ -402,7 +402,7 @@ export async function resolveRequestIssue(req: Request, res: Response, next: Nex
 
 export async function getSystemHealth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { config } = await import('../../config');
+    const { config, checkProductionEnvironment } = await import('../../config');
     const { RealtimeNotificationService } = await import('../../services/realtimeNotificationService');
 
     // 1. Check database latency & connectivity
@@ -438,6 +438,9 @@ export async function getSystemHealth(req: Request, res: Response, next: NextFun
       ? 'Configured'
       : 'Not Configured';
 
+    // 7. Safe environment audit
+    const environmentAudit = checkProductionEnvironment();
+
     sendSuccess(res, {
       database: { status: dbStatus, latencyMs: dbLatencyMs },
       auth: { status: authStatus },
@@ -447,6 +450,7 @@ export async function getSystemHealth(req: Request, res: Response, next: NextFun
       smsService: { status: smsStatus },
       mapService: { status: 'Healthy' },
       aiService: { status: 'Healthy' },
+      environmentAudit,
       timestamp: new Date().toISOString(),
     }, 'System health check completed');
   } catch (error) {

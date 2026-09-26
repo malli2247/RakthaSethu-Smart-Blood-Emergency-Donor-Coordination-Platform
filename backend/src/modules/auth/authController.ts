@@ -596,8 +596,18 @@ export async function sendOtp(req: Request, res: Response, next: NextFunction): 
     const result = await OtpService.sendOtp(phone, req.user?.id, req.ip);
 
     if (!result.success) {
+      if ((result as any).unconfigured) {
+        res.status(503).json({
+          success: false,
+          code: 'OTP_UNCONFIGURED',
+          message: result.message || 'OTP service is not configured.',
+        });
+        return;
+      }
+
       res.status(429).json({
         success: false,
+        code: 'RATE_LIMITED',
         message: result.message,
         data: {
           cooldownSeconds: result.cooldownSeconds,
@@ -607,13 +617,21 @@ export async function sendOtp(req: Request, res: Response, next: NextFunction): 
       return;
     }
 
-    sendSuccess(res, {
-      cooldownSeconds: result.cooldownSeconds,
-      expiresInSeconds: result.expiresInSeconds,
-    }, result.message);
+    sendSuccess(
+      res,
+      {
+        cooldownSeconds: result.cooldownSeconds,
+        expiresInSeconds: result.expiresInSeconds,
+      },
+      result.message
+    );
   } catch (error) {
     next(error);
   }
+}
+
+export async function resendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+  return sendOtp(req, res, next);
 }
 
 export async function verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {

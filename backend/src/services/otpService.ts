@@ -68,12 +68,12 @@ export class OtpService {
 
     // Determine OTP code:
     // In production, strictly generate cryptographically random 6-digit code.
-    // In development ONLY if ALLOW_TEST_OTP=true, allow a deterministic test OTP.
+    // In development ONLY if OTP_DEV_MODE=true or ALLOW_TEST_OTP=true, allow deterministic test OTP.
     let otp: string;
     const isProd = process.env.NODE_ENV === 'production';
-    const allowTestOtp = process.env.ALLOW_TEST_OTP === 'true';
+    const allowTestOtp = (process.env.OTP_DEV_MODE === 'true' || process.env.ALLOW_TEST_OTP === 'true') && !isProd;
 
-    if (!isProd && allowTestOtp) {
+    if (allowTestOtp) {
       otp = '789123'; // Explicit test OTP for local dev only
     } else {
       otp = crypto.randomInt(100000, 999999).toString();
@@ -111,7 +111,28 @@ export class OtpService {
 
     // Dispatch SMS via resilient SmsService
     const smsMessage = `Your RakthaSethu mobile verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
-    await SmsService.sendSms(cleanPhone, smsMessage);
+    const smsResult = await SmsService.sendSms(cleanPhone, smsMessage);
+
+    if (smsResult.unconfigured) {
+      otpStore.delete(cleanPhone);
+      return {
+        success: false,
+        unconfigured: true,
+        message: 'OTP service is not configured.',
+        cooldownSeconds: 0,
+        expiresInSeconds: 0,
+      };
+    }
+
+    if (!smsResult.success) {
+      otpStore.delete(cleanPhone);
+      return {
+        success: false,
+        message: 'Failed to deliver OTP via SMS. Please try again later.',
+        cooldownSeconds: 0,
+        expiresInSeconds: 0,
+      };
+    }
 
     // Record audit log (do not log plaintext OTP)
     await recordAuditLog({
