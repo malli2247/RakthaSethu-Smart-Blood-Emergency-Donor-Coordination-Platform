@@ -36,7 +36,7 @@ export const DonorProfilePage: React.FC = () => {
           setBloodGroup(d.bloodGroup);
           setGender(d.gender);
           setPhone(d.user?.phone || '');
-          setIsVerified(Boolean(d.user?.isVerified));
+          setIsVerified(Boolean(d.isPhoneVerified || d.user?.isPhoneVerified));
           setCity(d.city);
           setState(d.state);
           setAddress(d.address);

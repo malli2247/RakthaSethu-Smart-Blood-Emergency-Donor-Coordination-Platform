@@ -1,4 +1,4 @@
-﻿import { prisma } from '../../config/database';
+import { prisma } from '../../config/database';
 import { canDonateTo, getCompatibleDonorGroups, BloodGroupType, BLOOD_GROUP_LABELS } from '../../utils/compatibility';
 import { calculateDistanceKm } from '../../utils/distance';
 
@@ -16,6 +16,7 @@ export interface DonorMatchCandidate {
   isAvailable: boolean;
   emergencyAvailable: boolean;
   totalDonations: number;
+  isPhoneVerified: boolean;
   maskedPhone: string;
   phone?: string; // only if match accepted
   exactAddress?: string; // only if match accepted
@@ -73,6 +74,7 @@ export class MatchingService {
             email: true,
             phone: true,
             isActive: true,
+            isPhoneVerified: true,
           },
         },
       },
@@ -129,6 +131,12 @@ export class MatchingService {
         score += 10;
       }
 
+      // Mobile verification trust bonus (verified phone ensures reachable donor)
+      const isPhoneVerified = Boolean(donor.isPhoneVerified || donor.user.isPhoneVerified);
+      if (isPhoneVerified) {
+        score += 10;
+      }
+
       // Distance score (Closer = higher score up to 15 points)
       if (distanceKm !== null) {
         const proximityScore = Math.max(0, 15 * (1 - Math.min(distanceKm, 100) / 100));
@@ -161,6 +169,7 @@ export class MatchingService {
         isAvailable: donor.isAvailable,
         emergencyAvailable: donor.emergencyAvailable,
         totalDonations: donor.totalDonations,
+        isPhoneVerified,
         maskedPhone,
       });
     }

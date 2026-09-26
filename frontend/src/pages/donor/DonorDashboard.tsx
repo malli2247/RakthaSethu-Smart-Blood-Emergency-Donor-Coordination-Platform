@@ -138,7 +138,7 @@ export const DonorDashboard: React.FC = () => {
       </div>
 
       {/* Mobile Verification Alert Banner */}
-      {!profile?.user?.isVerified && (
+      {!(profile?.isPhoneVerified || profile?.user?.isPhoneVerified) && (
         <div className="p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">

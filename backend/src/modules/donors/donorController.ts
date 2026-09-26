@@ -17,6 +17,8 @@ export async function getDonorProfile(req: Request, res: Response, next: NextFun
             phone: true,
             isActive: true,
             isVerified: true,
+            isPhoneVerified: true,
+            phoneVerifiedAt: true,
           },
         },
       },
@@ -38,6 +40,8 @@ export async function getDonorProfile(req: Request, res: Response, next: NextFun
 
     sendSuccess(res, {
       ...donor,
+      isPhoneVerified: Boolean(donor.isPhoneVerified || donor.user.isPhoneVerified),
+      phoneVerifiedAt: donor.phoneVerifiedAt || donor.user.phoneVerifiedAt,
       nextEligibleDate,
       daysUntilEligible,
     });
@@ -76,11 +80,35 @@ export async function updateDonorProfile(req: Request, res: Response, next: Next
       if (user && user.phone !== phone) {
         await prisma.user.update({
           where: { id: userId },
-          data: { phone, isVerified: false },
+          data: {
+            phone,
+            isVerified: false,
+            isPhoneVerified: false,
+            phoneVerifiedAt: null,
+          },
         });
-        const { OtpService } = await import('../../services/otpService');
-        OtpService.invalidateOtp(phone);
-        if (user.phone) OtpService.invalidateOtp(user.phone);
+        await prisma.donorProfile.update({
+          where: { userId },
+          data: {
+            isPhoneVerified: false,
+            phoneVerifiedAt: null,
+          },
+        });
+        const { OtpService, maskPhoneNumber } = await import('../../services/otpService');
+        await OtpService.invalidateOtp(phone);
+        if (user.phone) await OtpService.invalidateOtp(user.phone);
+
+        const { recordAuditLog } = await import('../../utils/auditLogger');
+        await recordAuditLog({
+          userId,
+          action: 'MOBILE_CHANGED',
+          entity: 'DonorProfile',
+          details: {
+            oldPhoneMasked: maskPhoneNumber(user.phone),
+            newPhoneMasked: maskPhoneNumber(phone),
+          },
+          ipAddress: req.ip,
+        });
       }
     }
 

@@ -15,12 +15,15 @@ model User {
   role             String            @default("DONOR")
   isActive         Boolean           @default(true)
   isVerified       Boolean           @default(false)
+  isPhoneVerified  Boolean           @default(false)
+  phoneVerifiedAt  DateTime?
   lastLogin        DateTime?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
   refreshTokens    RefreshToken[]
   verificationTokens VerificationToken[]
+  mobileOtps       MobileOtp[]
   donorProfile     DonorProfile?
   patientProfile   PatientProfile?
   hospitalProfile  Hospital?
@@ -88,6 +91,8 @@ model DonorProfile {
   badges               String        @default("[]")
   availabilityStatus   String        @default("AVAILABLE")
   consentGiven         Boolean       @default(true)
+  isPhoneVerified      Boolean       @default(false)
+  phoneVerifiedAt      DateTime?
   hidePhoneNumber      Boolean       @default(false)
   hideExactAddress     Boolean       @default(true)
   createdAt            DateTime      @default(now())
@@ -645,5 +650,23 @@ model OfflineSyncEvent {
 
   @@index([idempotencyKey])
   @@index([status])
+}
+
+model MobileOtp {
+  id           String    @id @default(uuid())
+  userId       String?
+  phone        String
+  purpose      String    @default("MOBILE_VERIFICATION")
+  otpHash      String
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([phone, purpose])
+  @@index([userId, purpose])
+  @@index([expiresAt])
 }
 

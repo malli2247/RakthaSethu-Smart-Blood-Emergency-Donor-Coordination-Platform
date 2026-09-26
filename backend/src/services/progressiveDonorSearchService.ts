@@ -54,6 +54,7 @@ export interface ScoredDonorCandidate {
   totalDonations: number;
   isAvailable: boolean;
   emergencyAvailable: boolean;
+  isPhoneVerified: boolean;
   discoveredAtRadiusKm: number;
 }
 
@@ -299,7 +300,7 @@ export class ProgressiveDonorSearchService {
       },
       include: {
         user: {
-          select: { id: true, email: true, phone: true, isActive: true },
+          select: { id: true, email: true, phone: true, isActive: true, isPhoneVerified: true },
         },
       },
     });
@@ -437,6 +438,7 @@ export class ProgressiveDonorSearchService {
           totalDonations: donor.totalDonations,
           isAvailable: donor.isAvailable,
           emergencyAvailable: donor.emergencyAvailable,
+          isPhoneVerified: Boolean(donor.isPhoneVerified || donor.user?.isPhoneVerified),
           discoveredAtRadiusKm: currentRadius,
         };
 
@@ -942,7 +944,7 @@ export class ProgressiveDonorSearchService {
       include: {
         donor: {
           include: {
-            user: { select: { phone: true, isActive: true } },
+            user: { select: { phone: true, isActive: true, isPhoneVerified: true } },
           },
         },
       },
@@ -972,6 +974,7 @@ export class ProgressiveDonorSearchService {
       totalDonations: m.donor.totalDonations,
       isAvailable: m.donor.isAvailable,
       emergencyAvailable: m.donor.emergencyAvailable,
+      isPhoneVerified: Boolean(m.donor.isPhoneVerified || m.donor.user?.isPhoneVerified),
       discoveredAtRadiusKm: m.distanceKm ? Math.ceil(m.distanceKm) : dbSearch.currentRadiusKm,
     }));
 
@@ -1059,6 +1062,8 @@ export class ProgressiveDonorSearchService {
 
     let experienceScore = Math.min(5, donor.totalDonations);
     let predictedResponseBonus = Math.round(responseProbability * 10);
+    const isPhoneVerified = Boolean(donor.isPhoneVerified || donor.user?.isPhoneVerified);
+    let verificationBonus = isPhoneVerified ? 5 : 0;
 
     const totalScore = Math.min(
       100,
@@ -1068,7 +1073,8 @@ export class ProgressiveDonorSearchService {
         emergencyScore +
         proximityScore +
         experienceScore +
-        predictedResponseBonus
+        predictedResponseBonus +
+        verificationBonus
     );
 
     return {
@@ -1081,6 +1087,7 @@ export class ProgressiveDonorSearchService {
         proximity: proximityScore,
         experience: experienceScore,
         predictedResponseBonus,
+        phoneVerificationBonus: verificationBonus,
       },
     };
   }

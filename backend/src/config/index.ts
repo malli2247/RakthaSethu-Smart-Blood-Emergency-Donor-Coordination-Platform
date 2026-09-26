@@ -62,11 +62,40 @@ export const config = {
   },
 
   sms: {
-    provider: process.env.SMS_PROVIDER || (isProd ? 'twilio' : 'mock'),
-    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || '',
-    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN || '',
-    twilioPhoneNumber: process.env.TWILIO_PHONE_NUMBER || '',
-    fast2smsApiKey: process.env.FAST2SMS_API_KEY || '',
+    provider:
+      process.env.SMS_PROVIDER ||
+      (isProd
+        ? process.env.TWILIO_ACCOUNT_SID
+          ? 'twilio'
+          : process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_KEY
+          ? 'fast2sms'
+          : process.env.MSG91_AUTH_KEY || process.env.MSG91_KEY
+          ? 'msg91'
+          : process.env.SMS_GATEWAY_URL
+          ? 'gateway'
+          : 'twilio'
+        : 'mock'),
+    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || process.env.OTP_PROVIDER_ACCOUNT_SID || '',
+    twilioAuthToken:
+      process.env.TWILIO_AUTH_TOKEN ||
+      process.env.OTP_PROVIDER_AUTH_TOKEN ||
+      process.env.OTP_PROVIDER_SECRET ||
+      '',
+    twilioPhoneNumber:
+      process.env.TWILIO_PHONE_NUMBER ||
+      process.env.OTP_PROVIDER_SENDER ||
+      process.env.TWILIO_FROM ||
+      '',
+    fast2smsApiKey:
+      process.env.FAST2SMS_API_KEY ||
+      process.env.FAST2SMS_KEY ||
+      process.env.OTP_PROVIDER_API_KEY ||
+      '',
+    msg91AuthKey: process.env.MSG91_AUTH_KEY || process.env.MSG91_KEY || '',
+    msg91TemplateId: process.env.MSG91_TEMPLATE_ID || process.env.MSG91_OTP_TEMPLATE_ID || '',
+    msg91Sender: process.env.MSG91_SENDER_ID || process.env.MSG91_SENDER || 'RKTHST',
+    gatewayUrl: process.env.SMS_GATEWAY_URL || process.env.OTP_GATEWAY_URL || '',
+    gatewayApiKey: process.env.SMS_GATEWAY_API_KEY || '',
   },
 
   storage: {
@@ -204,6 +233,12 @@ export function checkProductionEnvironment(): Record<string, ConfigStatus> {
       config.sms.twilioAccountSid && config.sms.twilioAuthToken && config.sms.twilioPhoneNumber
         ? 'CONFIGURED'
         : 'MISSING';
+  } else if (config.sms.provider === 'fast2sms') {
+    smsStatus = config.sms.fast2smsApiKey ? 'CONFIGURED' : 'MISSING';
+  } else if (config.sms.provider === 'msg91') {
+    smsStatus = config.sms.msg91AuthKey ? 'CONFIGURED' : 'MISSING';
+  } else if (config.sms.provider === 'gateway') {
+    smsStatus = config.sms.gatewayUrl ? 'CONFIGURED' : 'MISSING';
   } else if (config.sms.provider === 'mock') {
     smsStatus = config.isProduction && process.env.OTP_DEV_MODE !== 'true' ? 'INVALID' : 'CONFIGURED';
   }
@@ -269,8 +304,14 @@ export function validateEnvironment(): void {
     logger.warn('Email provider is set to SMTP but credentials are empty. Outgoing emails will be simulated.');
   }
 
-  if (config.sms.provider === 'twilio' && (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken)) {
-    logger.warn('SMS provider is set to Twilio but credentials are empty. SMS alerts will run in simulation mode.');
+  if (config.sms.provider === 'twilio' && (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken || !config.sms.twilioPhoneNumber)) {
+    logger.warn('SMS provider is set to Twilio but credentials are incomplete. SMS alerts will be unavailable.');
+  } else if (config.sms.provider === 'fast2sms' && !config.sms.fast2smsApiKey) {
+    logger.warn('SMS provider is set to Fast2SMS but FAST2SMS_API_KEY is missing. SMS alerts will be unavailable.');
+  } else if (config.sms.provider === 'msg91' && !config.sms.msg91AuthKey) {
+    logger.warn('SMS provider is set to MSG91 but MSG91_AUTH_KEY is missing. SMS alerts will be unavailable.');
+  } else if (config.sms.provider === 'gateway' && !config.sms.gatewayUrl) {
+    logger.warn('SMS provider is set to generic gateway but SMS_GATEWAY_URL is missing. SMS alerts will be unavailable.');
   }
 
   if (!config.ai.apiKey) {

@@ -587,20 +587,48 @@ export async function verifyEmail(req: Request, res: Response, next: NextFunctio
 
 export async function sendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { phone } = req.body;
-    if (!phone) {
+    let targetPhone = req.body.phone;
+
+    // If authenticated, prefer registered phone unless explicit new phone provided
+    if (req.user) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { id: true, phone: true },
+      });
+      if (!targetPhone && user?.phone) {
+        targetPhone = user.phone;
+      }
+    }
+
+    if (!targetPhone) {
       throw new AppError('Mobile phone number is required.', 400, 'PHONE_REQUIRED');
     }
 
+    const purpose = req.body.purpose || 'MOBILE_VERIFICATION';
     const { OtpService } = await import('../../services/otpService');
-    const result = await OtpService.sendOtp(phone, req.user?.id, req.ip);
+    const result = await OtpService.sendOtp(targetPhone, req.user?.id, req.ip, purpose);
 
     if (!result.success) {
       if ((result as any).unconfigured) {
         res.status(503).json({
           success: false,
-          code: 'OTP_UNCONFIGURED',
-          message: result.message || 'OTP service is not configured.',
+          code: 'OTP_TEMPORARILY_UNAVAILABLE',
+          message:
+            result.message ||
+            'Mobile verification is temporarily unavailable. Please try again later.',
+        });
+        return;
+      }
+
+      if ((result as any).rateLimited) {
+        res.status(429).json({
+          success: false,
+          code: 'RATE_LIMITED',
+          message: result.message,
+          data: {
+            cooldownSeconds: result.cooldownSeconds,
+            expiresInSeconds: result.expiresInSeconds,
+          },
         });
         return;
       }
@@ -636,13 +664,29 @@ export async function resendOtp(req: Request, res: Response, next: NextFunction)
 
 export async function verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { phone, otp } = req.body;
+    let { phone, otp, purpose } = req.body;
+
+    // If authenticated and phone not explicitly sent, use user's phone
+    if (!phone && req.user) {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { phone: true },
+      });
+      phone = user?.phone;
+    }
+
     if (!phone || !otp) {
       throw new AppError('Both phone and 6-digit OTP code are required.', 400, 'MISSING_FIELDS');
     }
 
     const { OtpService } = await import('../../services/otpService');
-    const result = await OtpService.verifyOtp(phone, otp, req.user?.id, req.ip);
+    const result = await OtpService.verifyOtp(
+      phone,
+      otp,
+      req.user?.id,
+      req.ip,
+      purpose || 'MOBILE_VERIFICATION'
+    );
 
     if (!result.verified) {
       throw new AppError(result.message, 400, 'OTP_VERIFICATION_FAILED');
@@ -653,4 +697,5 @@ export async function verifyOtp(req: Request, res: Response, next: NextFunction)
     next(error);
   }
 }
+
 

@@ -12,78 +12,187 @@ export interface OtpRecord {
   lastSentAt: Date;
   verified: boolean;
   userId?: string;
+  purpose?: string;
 }
 
-// In-memory store for OTP records with thread-safe operations
+// In-memory cache for ultra-fast cooldown checking and local fallbacks
 const otpStore = new Map<string, OtpRecord>();
 
-// Clean expired records every 10 minutes
+// Clean expired records every 10 minutes from memory
 setInterval(() => {
   const now = new Date();
-  for (const [phone, record] of otpStore.entries()) {
+  for (const [key, record] of otpStore.entries()) {
     if (record.expiresAt < now && !record.verified) {
-      otpStore.delete(phone);
+      otpStore.delete(key);
     }
   }
 }, 10 * 60 * 1000);
+
+export function maskPhoneNumber(phone?: string | null): string {
+  if (!phone) return 'Unknown';
+  const clean = phone.trim().replace(/\s+/g, '');
+  if (clean.length < 7) return clean;
+  return `${clean.slice(0, 3)}****${clean.slice(-3)}`;
+}
 
 export class OtpService {
   private static readonly OTP_EXPIRY_MINUTES = 5;
   private static readonly RESEND_COOLDOWN_SECONDS = 30;
   private static readonly MAX_ATTEMPTS = 5;
+  private static readonly MAX_HOURLY_REQUESTS = 5;
 
   private static hashOtp(otp: string): string {
-    return crypto.createHash('sha256').update(otp).digest('hex');
+    return crypto.createHash('sha256').update(otp.trim()).digest('hex');
+  }
+
+  private static getStoreKey(phone: string, purpose: string): string {
+    return `${phone.trim()}:${purpose}`;
   }
 
   /**
-   * Generates and dispatches a cryptographically secure 6-digit OTP
+   * Generates and dispatches a cryptographically secure 6-digit OTP backed by database persistence.
    */
   static async sendOtp(
     phone: string,
     userId?: string,
-    ipAddress?: string
-  ): Promise<{ success: boolean; unconfigured?: boolean; message: string; cooldownSeconds: number; expiresInSeconds: number }> {
+    ipAddress?: string,
+    purpose: string = 'MOBILE_VERIFICATION'
+  ): Promise<{
+    success: boolean;
+    unconfigured?: boolean;
+    rateLimited?: boolean;
+    message: string;
+    cooldownSeconds: number;
+    expiresInSeconds: number;
+  }> {
     const cleanPhone = phone.trim().replace(/\s+/g, '');
     if (!cleanPhone || cleanPhone.length < 10) {
       throw new Error('Please provide a valid 10-digit mobile number');
     }
 
-    const existing = otpStore.get(cleanPhone);
+    const storeKey = this.getStoreKey(cleanPhone, purpose);
     const now = new Date();
 
-    // Check resend cooldown
-    if (existing) {
-      const elapsedSeconds = Math.floor((now.getTime() - existing.lastSentAt.getTime()) / 1000);
+    // 1. Resend Cooldown Check (Memory + DB)
+    const existingMemory = otpStore.get(storeKey) || otpStore.get(cleanPhone);
+    if (existingMemory) {
+      const elapsedSeconds = Math.floor((now.getTime() - existingMemory.lastSentAt.getTime()) / 1000);
       if (elapsedSeconds < this.RESEND_COOLDOWN_SECONDS) {
         const remainingCooldown = this.RESEND_COOLDOWN_SECONDS - elapsedSeconds;
         return {
           success: false,
           message: `Please wait ${remainingCooldown} seconds before requesting a new OTP.`,
           cooldownSeconds: remainingCooldown,
-          expiresInSeconds: Math.max(0, Math.floor((existing.expiresAt.getTime() - now.getTime()) / 1000)),
+          expiresInSeconds: Math.max(
+            0,
+            Math.floor((existingMemory.expiresAt.getTime() - now.getTime()) / 1000)
+          ),
         };
       }
     }
 
-    // Determine OTP code:
-    // In production, strictly generate cryptographically random 6-digit code.
-    // In development ONLY if OTP_DEV_MODE=true or ALLOW_TEST_OTP=true, allow deterministic test OTP.
+    // Check DB for recent active OTP within cooldown period
+    try {
+      const recentDbOtp = await prisma.mobileOtp.findFirst({
+        where: {
+          phone: cleanPhone,
+          purpose,
+          consumedAt: null,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (recentDbOtp) {
+        const elapsedSinceCreated = Math.floor((now.getTime() - recentDbOtp.createdAt.getTime()) / 1000);
+        if (elapsedSinceCreated < this.RESEND_COOLDOWN_SECONDS) {
+          const remainingCooldown = this.RESEND_COOLDOWN_SECONDS - elapsedSinceCreated;
+          return {
+            success: false,
+            message: `Please wait ${remainingCooldown} seconds before requesting a new OTP.`,
+            cooldownSeconds: remainingCooldown,
+            expiresInSeconds: Math.max(
+              0,
+              Math.floor((recentDbOtp.expiresAt.getTime() - now.getTime()) / 1000)
+            ),
+          };
+        }
+      }
+
+      // 2. Hourly Rate Limiting Check (Max 5 OTP requests per hour per phone)
+      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+      const hourlyCount = await prisma.mobileOtp.count({
+        where: {
+          phone: cleanPhone,
+          createdAt: { gte: oneHourAgo },
+        },
+      });
+
+      if (hourlyCount >= this.MAX_HOURLY_REQUESTS) {
+        await recordAuditLog({
+          userId: userId || null,
+          action: 'OTP_RATE_LIMITED',
+          entity: 'OtpVerification',
+          details: { phoneMasked: maskPhoneNumber(cleanPhone), hourlyCount },
+          ipAddress,
+        });
+
+        return {
+          success: false,
+          rateLimited: true,
+          message: 'Maximum OTP requests exceeded for this hour. Please try again later.',
+          cooldownSeconds: 3600,
+          expiresInSeconds: 0,
+        };
+      }
+    } catch (dbErr) {
+      logger.warn('[OtpService] Database check warning:', dbErr);
+    }
+
+    // 3. Cryptographically Secure OTP Generation
     let otp: string;
     const isProd = process.env.NODE_ENV === 'production';
-    const allowTestOtp = (process.env.OTP_DEV_MODE === 'true' || process.env.ALLOW_TEST_OTP === 'true') && !isProd;
+    const allowTestOtp =
+      (process.env.OTP_DEV_MODE === 'true' || process.env.ALLOW_TEST_OTP === 'true') && !isProd;
 
     if (allowTestOtp) {
-      otp = '789123'; // Explicit test OTP for local dev only
+      otp = '789123'; // Allowed only in development/testing modes
     } else {
-      otp = crypto.randomInt(100000, 999999).toString();
+      otp = crypto.randomInt(100000, 1000000).toString();
     }
 
     const hashedOtp = this.hashOtp(otp);
     const expiresAt = new Date(now.getTime() + this.OTP_EXPIRY_MINUTES * 60 * 1000);
 
-    // Save record
-    otpStore.set(cleanPhone, {
+    // 4. Invalidate Previous Unconsumed OTPs in Database
+    try {
+      await prisma.mobileOtp.updateMany({
+        where: {
+          phone: cleanPhone,
+          purpose,
+          consumedAt: null,
+        },
+        data: {
+          consumedAt: now,
+        },
+      });
+
+      // Persist New OTP Record in MobileOtp table
+      await prisma.mobileOtp.create({
+        data: {
+          userId: userId || null,
+          phone: cleanPhone,
+          purpose,
+          otpHash: hashedOtp,
+          expiresAt,
+          attemptCount: 0,
+        },
+      });
+    } catch (dbErr) {
+      logger.error('[OtpService] Failed to persist MobileOtp in database:', dbErr);
+    }
+
+    // Cache in memory for quick lookups
+    const record: OtpRecord = {
       phone: cleanPhone,
       hashedOtp,
       expiresAt,
@@ -91,41 +200,62 @@ export class OtpService {
       lastSentAt: now,
       verified: false,
       userId,
+      purpose,
+    };
+    otpStore.set(storeKey, record);
+    otpStore.set(cleanPhone, record);
+
+    // Record OTP_REQUESTED Audit Log (Never log plaintext OTP)
+    await recordAuditLog({
+      userId: userId || null,
+      action: 'OTP_REQUESTED',
+      entity: 'OtpVerification',
+      details: {
+        phoneMasked: maskPhoneNumber(cleanPhone),
+        purpose,
+        expiresAt,
+      },
+      ipAddress,
     });
 
-    // Also persist in VerificationToken table if user exists
-    if (userId) {
-      try {
-        await prisma.verificationToken.create({
-          data: {
-            userId,
-            token: hashedOtp,
-            type: 'PHONE_OTP',
-            expiresAt,
-          },
-        });
-      } catch (err) {
-        logger.warn('[OtpService] Failed to persist VerificationToken row:', err);
-      }
-    }
-
-    // Dispatch SMS via resilient SmsService
-    const smsMessage = `Your RakthaSethu mobile verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
-    const smsResult = await SmsService.sendSms(cleanPhone, smsMessage);
+    // 5. Dispatch SMS via Multi-Provider SMS Service
+    const smsMessage = `Your RakthaSethu verification code is: ${otp}. Valid for 5 minutes. Do not share this code with anyone.`;
+    const smsResult = await SmsService.sendSms(cleanPhone, smsMessage, otp);
 
     if (smsResult.unconfigured) {
+      // Invalidate current OTP record
+      try {
+        await prisma.mobileOtp.updateMany({
+          where: { phone: cleanPhone, otpHash: hashedOtp },
+          data: { consumedAt: now },
+        });
+      } catch (err) {
+        // ignore
+      }
+      otpStore.delete(storeKey);
       otpStore.delete(cleanPhone);
+
       return {
         success: false,
         unconfigured: true,
-        message: 'OTP service is not configured.',
+        message: 'Mobile verification is temporarily unavailable. Please try again later.',
         cooldownSeconds: 0,
         expiresInSeconds: 0,
       };
     }
 
     if (!smsResult.success) {
+      try {
+        await prisma.mobileOtp.updateMany({
+          where: { phone: cleanPhone, otpHash: hashedOtp },
+          data: { consumedAt: now },
+        });
+      } catch (err) {
+        // ignore
+      }
+      otpStore.delete(storeKey);
       otpStore.delete(cleanPhone);
+
       return {
         success: false,
         message: 'Failed to deliver OTP via SMS. Please try again later.',
@@ -134,16 +264,20 @@ export class OtpService {
       };
     }
 
-    // Record audit log (do not log plaintext OTP)
+    // Record OTP_SENT Audit Log
     await recordAuditLog({
       userId: userId || null,
-      action: 'OTP_REQUESTED',
+      action: 'OTP_SENT',
       entity: 'OtpVerification',
-      details: { phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}`, expiresAt },
+      details: {
+        phoneMasked: maskPhoneNumber(cleanPhone),
+        provider: smsResult.provider || 'default',
+        simulated: smsResult.simulated || false,
+      },
       ipAddress,
     });
 
-    logger.info(`[OtpService] OTP dispatched for ${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}`);
+    logger.info(`[OtpService] OTP dispatched for ${maskPhoneNumber(cleanPhone)}`);
 
     return {
       success: true,
@@ -154,13 +288,14 @@ export class OtpService {
   }
 
   /**
-   * Verifies the submitted OTP against the stored hash
+   * Verifies the submitted OTP against the cryptographically stored SHA-256 hash in database.
    */
   static async verifyOtp(
     phone: string,
     otp: string,
     userId?: string,
-    ipAddress?: string
+    ipAddress?: string,
+    purpose: string = 'MOBILE_VERIFICATION'
   ): Promise<{ success: boolean; message: string; verified: boolean }> {
     const cleanPhone = phone.trim().replace(/\s+/g, '');
     const cleanOtp = otp.trim();
@@ -169,10 +304,28 @@ export class OtpService {
       return { success: false, message: 'Invalid 6-digit OTP provided.', verified: false };
     }
 
-    const record = otpStore.get(cleanPhone);
+    const storeKey = this.getStoreKey(cleanPhone, purpose);
     const now = new Date();
 
-    if (!record) {
+    // 1. Look up active record in MobileOtp table
+    let dbRecord: any = null;
+    try {
+      dbRecord = await prisma.mobileOtp.findFirst({
+        where: {
+          phone: cleanPhone,
+          purpose,
+          consumedAt: null,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    } catch (err) {
+      logger.warn('[OtpService] Database query for MobileOtp failed, falling back to memory:', err);
+    }
+
+    const memRecord = otpStore.get(storeKey) || otpStore.get(cleanPhone);
+
+    // If neither DB record nor memory record found
+    if (!dbRecord && !memRecord) {
       return {
         success: false,
         message: 'No active OTP found for this mobile number. Please request a new code.',
@@ -180,15 +333,29 @@ export class OtpService {
       };
     }
 
-    if (record.expiresAt < now) {
+    const expiresAt = dbRecord ? dbRecord.expiresAt : memRecord!.expiresAt;
+    const currentAttempts = dbRecord ? dbRecord.attemptCount : memRecord!.attempts;
+    const expectedHash = dbRecord ? dbRecord.otpHash : memRecord!.hashedOtp;
+
+    // 2. Expiration Check
+    if (expiresAt < now) {
+      if (dbRecord) {
+        await prisma.mobileOtp.update({
+          where: { id: dbRecord.id },
+          data: { consumedAt: now },
+        }).catch(() => null);
+      }
+      otpStore.delete(storeKey);
       otpStore.delete(cleanPhone);
+
       await recordAuditLog({
-        userId: userId || record.userId || null,
+        userId: userId || dbRecord?.userId || memRecord?.userId || null,
         action: 'OTP_EXPIRED',
         entity: 'OtpVerification',
-        details: { phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}` },
+        details: { phoneMasked: maskPhoneNumber(cleanPhone), purpose },
         ipAddress,
       });
+
       return {
         success: false,
         message: 'This OTP has expired. Please request a new verification code.',
@@ -196,15 +363,28 @@ export class OtpService {
       };
     }
 
-    if (record.attempts >= this.MAX_ATTEMPTS) {
+    // 3. Max Attempts Check
+    if (currentAttempts >= this.MAX_ATTEMPTS) {
+      if (dbRecord) {
+        await prisma.mobileOtp.update({
+          where: { id: dbRecord.id },
+          data: { consumedAt: now },
+        }).catch(() => null);
+      }
+      otpStore.delete(storeKey);
       otpStore.delete(cleanPhone);
+
       await recordAuditLog({
-        userId: userId || record.userId || null,
-        action: 'OTP_MAX_ATTEMPTS_EXCEEDED',
+        userId: userId || dbRecord?.userId || memRecord?.userId || null,
+        action: 'OTP_VERIFICATION_FAILED',
         entity: 'OtpVerification',
-        details: { phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}` },
+        details: {
+          phoneMasked: maskPhoneNumber(cleanPhone),
+          reason: 'MAX_ATTEMPTS_EXCEEDED',
+        },
         ipAddress,
       });
+
       return {
         success: false,
         message: 'Maximum verification attempts exceeded. Please request a new OTP.',
@@ -212,18 +392,44 @@ export class OtpService {
       };
     }
 
+    // 4. Constant-Time or SHA-256 Hash Verification
     const submittedHash = this.hashOtp(cleanOtp);
-    if (submittedHash !== record.hashedOtp) {
-      record.attempts += 1;
-      if (record.attempts >= this.MAX_ATTEMPTS) {
-        otpStore.delete(cleanPhone);
-        await recordAuditLog({
-          userId: userId || record.userId || null,
-          action: 'OTP_MAX_ATTEMPTS_EXCEEDED',
-          entity: 'OtpVerification',
-          details: { phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}` },
-          ipAddress,
-        });
+    const hashesMatch = crypto.timingSafeEqual(
+      Buffer.from(submittedHash, 'utf8'),
+      Buffer.from(expectedHash, 'utf8')
+    );
+
+    if (!hashesMatch) {
+      const newAttempts = currentAttempts + 1;
+      if (dbRecord) {
+        await prisma.mobileOtp.update({
+          where: { id: dbRecord.id },
+          data: {
+            attemptCount: { increment: 1 },
+            ...(newAttempts >= this.MAX_ATTEMPTS ? { consumedAt: now } : {}),
+          },
+        }).catch(() => null);
+      }
+      if (memRecord) {
+        memRecord.attempts = newAttempts;
+        if (newAttempts >= this.MAX_ATTEMPTS) {
+          otpStore.delete(storeKey);
+          otpStore.delete(cleanPhone);
+        }
+      }
+
+      await recordAuditLog({
+        userId: userId || dbRecord?.userId || memRecord?.userId || null,
+        action: 'OTP_VERIFICATION_FAILED',
+        entity: 'OtpVerification',
+        details: {
+          phoneMasked: maskPhoneNumber(cleanPhone),
+          attemptNumber: newAttempts,
+        },
+        ipAddress,
+      });
+
+      if (newAttempts >= this.MAX_ATTEMPTS) {
         return {
           success: false,
           message: 'Maximum verification attempts exceeded. Please request a new OTP.',
@@ -231,14 +437,7 @@ export class OtpService {
         };
       }
 
-      await recordAuditLog({
-        userId: userId || record.userId || null,
-        action: 'OTP_FAILED_ATTEMPT',
-        entity: 'OtpVerification',
-        details: { attempts: record.attempts, phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}` },
-        ipAddress,
-      });
-      const remainingAttempts = this.MAX_ATTEMPTS - record.attempts;
+      const remainingAttempts = this.MAX_ATTEMPTS - newAttempts;
       return {
         success: false,
         message: `Incorrect OTP. You have ${remainingAttempts} attempt(s) remaining.`,
@@ -246,12 +445,18 @@ export class OtpService {
       };
     }
 
-    // Success! Mark verified
-    record.verified = true;
+    // 5. Verification Succeeded! Mark OTP Consumed in DB & Memory
+    if (dbRecord) {
+      await prisma.mobileOtp.update({
+        where: { id: dbRecord.id },
+        data: { consumedAt: now },
+      }).catch(() => null);
+    }
+    otpStore.delete(storeKey);
     otpStore.delete(cleanPhone);
 
-    // If userId provided or known, update User and DonorProfile in database
-    const targetUserId = userId || record.userId;
+    // 6. Update User and DonorProfile Verification Status in Database
+    const targetUserId = userId || dbRecord?.userId || memRecord?.userId;
     if (targetUserId) {
       try {
         await prisma.user.update({
@@ -259,26 +464,30 @@ export class OtpService {
           data: {
             phone: cleanPhone,
             isVerified: true,
+            isPhoneVerified: true,
+            phoneVerifiedAt: now,
           },
         });
 
-        // Also ensure donor profile is marked active / eligible
         await prisma.donorProfile.updateMany({
           where: { userId: targetUserId },
           data: {
+            isPhoneVerified: true,
+            phoneVerifiedAt: now,
             isEligible: true,
           },
         });
       } catch (err) {
-        logger.error('[OtpService] Failed to update user verification status in database:', err);
+        logger.error('[OtpService] Failed to update user mobile verification status:', err);
       }
     }
 
+    // 7. Record OTP_VERIFICATION_SUCCESS Audit Log
     await recordAuditLog({
       userId: targetUserId || null,
-      action: 'OTP_VERIFIED',
+      action: 'OTP_VERIFICATION_SUCCESS',
       entity: 'OtpVerification',
-      details: { phoneMasked: `${cleanPhone.slice(0, 3)}****${cleanPhone.slice(-2)}` },
+      details: { phoneMasked: maskPhoneNumber(cleanPhone), purpose },
       ipAddress,
     });
 
@@ -292,13 +501,34 @@ export class OtpService {
   /**
    * Invalidates any active OTP for a mobile number
    */
-  static invalidateOtp(phone: string): void {
+  static async invalidateOtp(phone: string, purpose?: string): Promise<void> {
     const cleanPhone = phone.trim().replace(/\s+/g, '');
+
+    if (purpose) {
+      otpStore.delete(this.getStoreKey(cleanPhone, purpose));
+    } else {
+      for (const key of Array.from(otpStore.keys())) {
+        if (key === cleanPhone || key.startsWith(`${cleanPhone}:`)) {
+          otpStore.delete(key);
+        }
+      }
+    }
     otpStore.delete(cleanPhone);
+
+    try {
+      await prisma.mobileOtp.deleteMany({
+        where: {
+          phone: cleanPhone,
+          ...(purpose ? { purpose } : {}),
+        },
+      });
+    } catch (err) {
+      // Ignore if database call fails during unit tests
+    }
   }
 
   /**
-   * Checks if a phone has been verified recently
+   * Synchronous check for memory or test verification
    */
   static isPhoneVerified(phone: string): boolean {
     const cleanPhone = phone.trim().replace(/\s+/g, '');
