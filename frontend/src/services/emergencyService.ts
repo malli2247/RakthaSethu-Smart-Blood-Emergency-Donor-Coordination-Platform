@@ -35,6 +35,23 @@ export interface ScoredCandidate {
   discoveredAtRadiusKm: number;
 }
 
+export interface RadiusMetrics {
+  radiusKm: number;
+  candidatesEvaluated: number;
+  compatibleCount: number;
+  eligibleCount: number;
+  availableCount: number;
+  alreadyContactedCount: number;
+  newDonorsAtRadius: number;
+  cumulativeDonors: number;
+  remainingTarget: number;
+}
+
+export interface StageChecklist {
+  name: string;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'PENDING';
+}
+
 export interface ProgressiveSearchResult {
   searchId: string;
   requestId: string;
@@ -50,6 +67,8 @@ export interface ProgressiveSearchResult {
   searchSteps: ProgressiveSearchStep[];
   candidates: ScoredCandidate[];
   escalationPlan: Array<{ priority: number; action: string; description: string }> | null;
+  searchDurationMs?: number;
+  metrics?: RadiusMetrics[];
 }
 
 export interface CoordinationRoomData {
@@ -108,7 +127,39 @@ export const emergencyService = {
     return data.data;
   },
 
-  async getSearchStatus(requestId: string): Promise<any> {
+  async startProgressiveSearch(
+    requestId?: string,
+    customSequence?: number[],
+    minimumSuitableDonors?: number
+  ): Promise<{ searchId: string; status: string; target: number; radiusSequence: number[] }> {
+    if (!requestId) throw new Error('requestId is required');
+    const { data } = await api.post(`/blood-requests/${requestId}/matching/start`, {
+      customSequence,
+      minimumSuitableDonors,
+    });
+    return data.data;
+  },
+
+  async getSearchJob(searchId?: string): Promise<any> {
+    if (!searchId) return null;
+    const { data } = await api.get(`/matching/search/${searchId}`);
+    return data.data;
+  },
+
+  async cancelProgressiveSearch(searchId?: string): Promise<any> {
+    if (!searchId) return null;
+    const { data } = await api.post(`/matching/search/${searchId}/cancel`);
+    return data.data;
+  },
+
+  async continueProgressiveSearch(searchId?: string, additionalRadii?: number[]): Promise<any> {
+    if (!searchId) return null;
+    const { data } = await api.post(`/matching/search/${searchId}/continue`, { additionalRadii });
+    return data.data;
+  },
+
+  async getSearchStatus(requestId?: string): Promise<any> {
+    if (!requestId) return null;
     const { data } = await api.get(`/emergency/search/${requestId}`);
     return data.data;
   },

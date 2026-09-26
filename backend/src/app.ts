@@ -155,6 +155,7 @@ export function createApp(): Express {
   app.use('/api/auth', authRouter);
   app.use('/api/matching', matchingRouter);
   app.use('/api/requests', requestRouter);
+  app.use('/api/blood-requests', requestRouter);
   app.use('/api/donors', donorRouter);
   app.use('/api/hospitals', hospitalRouter);
   app.use('/api/blood-banks', bloodBankRouter);

@@ -22,13 +22,116 @@ export function streamEmergencyEvents(req: Request, res: Response): void {
  */
 export async function runProgressiveSearch(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { requestId, customSequence } = req.body;
+    const { requestId, customSequence, async: isAsync, minimumSuitableDonors } = req.body;
     if (!requestId) {
       throw new AppError('requestId is required to initiate search', 400);
     }
 
+    if (isAsync) {
+      const result = await ProgressiveDonorSearchService.startSearch(
+        requestId,
+        customSequence,
+        minimumSuitableDonors
+      );
+      sendSuccess(res, result, 'Progressive donor search initialized', 201);
+      return;
+    }
+
     const result = await ProgressiveDonorSearchService.executeSearch(requestId, customSequence);
     sendSuccess(res, result, 'Progressive donor search completed', 200);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Initiates an async search job returning searchId
+ */
+export async function startEmergencyProgressiveSearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { requestId, customSequence, minimumSuitableDonors } = req.body;
+    if (!requestId) {
+      throw new AppError('requestId is required to initiate search', 400);
+    }
+
+    const result = await ProgressiveDonorSearchService.startSearch(
+      requestId,
+      customSequence,
+      minimumSuitableDonors
+    );
+    sendSuccess(res, result, 'Progressive donor search initialized', 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Streams real-time Server-Sent Events for a progressive search job
+ */
+export async function streamEmergencySearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    await ProgressiveDonorSearchService.subscribeToStream(searchId, res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Cancels an active search job
+ */
+export async function cancelEmergencySearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const cancelled = await ProgressiveDonorSearchService.cancelSearch(searchId);
+    sendSuccess(res, { cancelled }, 'Search job cancelled');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Continues or expands an existing search job
+ */
+export async function continueEmergencySearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const { additionalRadii } = req.body || {};
+    const result = await ProgressiveDonorSearchService.continueSearch(searchId, additionalRadii);
+    sendSuccess(res, result, 'Search expanded to additional radii');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Retrieves progressive search snapshot by searchId
+ */
+export async function getEmergencySearchJob(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const snapshot = await ProgressiveDonorSearchService.getSearchSnapshot(searchId);
+    if (!snapshot) {
+      throw new AppError('Search job not found', 404);
+    }
+
+    sendSuccess(res, snapshot, 'Search snapshot retrieved');
   } catch (error) {
     next(error);
   }

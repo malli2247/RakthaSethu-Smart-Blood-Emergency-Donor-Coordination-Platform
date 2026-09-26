@@ -13,6 +13,7 @@ import {
 import { authenticateToken, optionalAuth, requireRole } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { createBloodRequestSchema, updateBloodRequestStatusSchema } from './requestSchemas';
+import { startMatchingForRequest } from '../matching/matchingController';
 
 export const requestRouter = Router();
 
@@ -64,3 +65,11 @@ requestRouter.post(
   authenticateToken,
   confirmReceipt
 );
+
+// Start progressive matching search for blood request
+requestRouter.post(
+  '/:id/matching/start',
+  optionalAuth,
+  startMatchingForRequest
+);
+

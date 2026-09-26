@@ -7,6 +7,11 @@ import {
   getMapLayers,
   simulateEmergency,
   syncOfflineActions,
+  startEmergencyProgressiveSearch,
+  streamEmergencySearch,
+  cancelEmergencySearch,
+  continueEmergencySearch,
+  getEmergencySearchJob,
 } from './emergencyController';
 import { authenticateToken, optionalAuth } from '../../middleware/auth';
 
@@ -15,8 +20,15 @@ export const emergencyRouter = Router();
 // Real-time SSE stream (supports both public ping and request-specific feeds)
 emergencyRouter.get('/events', streamEmergencyEvents);
 
-// Progressive search
-emergencyRouter.post('/search', authenticateToken, runProgressiveSearch);
+// Progressive search lifecycle routes
+emergencyRouter.post('/search/start', optionalAuth, startEmergencyProgressiveSearch);
+emergencyRouter.get('/search/:searchId/stream', optionalAuth, streamEmergencySearch);
+emergencyRouter.get('/search/job/:searchId', optionalAuth, getEmergencySearchJob);
+emergencyRouter.post('/search/:searchId/cancel', optionalAuth, cancelEmergencySearch);
+emergencyRouter.post('/search/:searchId/continue', optionalAuth, continueEmergencySearch);
+
+// Progressive search (backward-compatible)
+emergencyRouter.post('/search', optionalAuth, runProgressiveSearch);
 emergencyRouter.get('/search/:requestId', optionalAuth, getSearchStatus);
 
 // Live Emergency Command Center

@@ -102,6 +102,19 @@ export const config = {
     vapidSubject: process.env.VAPID_SUBJECT || 'mailto:admin@rakthasethu.org',
   },
 
+  matching: {
+    radiusSequence: (process.env.PROGRESSIVE_SEARCH_RADII || '5,7,9,10,15,20,25,50,100')
+      .split(',')
+      .map(Number)
+      .filter((n) => !isNaN(n) && n > 0),
+    minimumSuitableDonors: parseInt(process.env.MIN_SUITABLE_DONORS || '5', 10),
+    sequencesByUrgency: {
+      CRITICAL: [5, 7, 9, 10, 15, 20, 25, 50, 100],
+      HIGH: [5, 7, 9, 10, 15, 20, 25],
+      NORMAL: [5, 7, 10, 15, 20],
+    },
+  },
+
   constants: {
     DONATION_INTERVAL_DAYS: 90, // Minimum days between whole blood donations
     DEFAULT_SEARCH_RADIUS_KM: 50,

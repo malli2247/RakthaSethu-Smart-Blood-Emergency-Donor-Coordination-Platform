@@ -3,6 +3,7 @@ import { MatchingService } from './matchingService';
 import { sendSuccess, AppError } from '../../utils/response';
 import { prisma } from '../../config/database';
 import { BloodGroupType } from '../../utils/compatibility';
+import { ProgressiveDonorSearchService } from '../../services/progressiveDonorSearchService';
 
 export async function findDonors(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -134,3 +135,104 @@ export async function runMatchingForRequest(req: Request, res: Response, next: N
     next(error);
   }
 }
+
+/**
+ * Initiates an asynchronous progressive matching search job
+ * POST /api/blood-requests/:id/matching/start or POST /api/matching/search/start
+ */
+export async function startMatchingForRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const requestId = req.params.id || req.params.requestId || req.body.requestId;
+    if (!requestId) {
+      throw new AppError('requestId is required to start matching search', 400);
+    }
+
+    const { customSequence, minimumSuitableDonors } = req.body || {};
+    const result = await ProgressiveDonorSearchService.startSearch(
+      requestId,
+      customSequence,
+      minimumSuitableDonors
+    );
+
+    sendSuccess(res, result, 'Progressive donor search initialized', 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Real-time SSE stream for progressive search updates
+ * GET /api/matching/search/:searchId/stream
+ */
+export async function streamProgressiveSearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required to stream events', 400);
+    }
+
+    await ProgressiveDonorSearchService.subscribeToStream(searchId, res);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Gets snapshot state of a search job
+ * GET /api/matching/search/:searchId
+ */
+export async function getProgressiveSearchSnapshot(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const snapshot = await ProgressiveDonorSearchService.getSearchSnapshot(searchId);
+    if (!snapshot) {
+      throw new AppError('Progressive search job not found', 404);
+    }
+
+    sendSuccess(res, snapshot, 'Search snapshot retrieved');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Cancels an ongoing search job
+ * POST /api/matching/search/:searchId/cancel
+ */
+export async function cancelProgressiveSearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const cancelled = await ProgressiveDonorSearchService.cancelSearch(searchId);
+    sendSuccess(res, { cancelled }, 'Search job cancelled');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Continues or expands an existing search job
+ * POST /api/matching/search/:searchId/continue
+ */
+export async function continueProgressiveSearch(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { searchId } = req.params;
+    if (!searchId) {
+      throw new AppError('searchId is required', 400);
+    }
+
+    const { additionalRadii } = req.body || {};
+    const result = await ProgressiveDonorSearchService.continueSearch(searchId, additionalRadii);
+    sendSuccess(res, result, 'Search expanded to additional radii');
+  } catch (error) {
+    next(error);
+  }
+}
+
