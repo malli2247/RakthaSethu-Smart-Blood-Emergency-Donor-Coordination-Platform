@@ -53,6 +53,7 @@ import { CopilotPage } from '../pages/bloodbank/CopilotPage';
 // Emergency Progressive Search & Coordination Room
 import { ProgressiveSearchScreen } from '../pages/emergency/ProgressiveSearchScreen';
 import { CoordinationRoomPage } from '../pages/coordination/CoordinationRoomPage';
+import { NotificationCenterPage } from '../pages/notifications/NotificationCenterPage';
 
 const roleDashboards: Record<string, string> = {
   DONOR: '/donor/dashboard',
@@ -157,6 +158,9 @@ export const AppRoutes: React.FC = () => {
         <Route path="/admin/simulator" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><EmergencySimulatorPage /></ProtectedRoute>} />
         <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
         <Route path="/admin/verifications" element={<ProtectedRoute allowedRoles={['ADMIN', 'SUPER_ADMIN']}><AdminVerificationsPage /></ProtectedRoute>} />
+
+        {/* Global Notifications Center for all authenticated users */}
+        <Route path="/notifications" element={<NotificationCenterPage />} />
       </Route>
 
       {/* Fallback */}

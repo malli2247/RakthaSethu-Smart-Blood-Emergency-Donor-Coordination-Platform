@@ -304,10 +304,20 @@ export class ProgressiveDonorSearchService {
       // Dispatch non-blocking notification
       NotificationService.notify({
         userId: c.userId,
-        title: `URGENT BLOOD MATCH (${request.bloodGroup})`,
-        message: `${request.patientName} urgently requires ${request.unitsRequired} unit(s) of ${request.bloodGroup} at ${request.hospitalName}. Discovered within ${c.discoveredAtRadiusKm}km.`,
-        type: urgency === 'CRITICAL' ? 'EMERGENCY_ALERT' : 'NEW_REQUEST',
-        link: `/donor/requests`,
+        title: urgency === 'CRITICAL' ? `🚨 CRITICAL BLOOD MATCH (${request.bloodGroup})` : `Urgent Blood Match (${request.bloodGroup})`,
+        message: `${request.patientName} urgently requires ${request.unitsRequired} unit(s) of ${request.bloodGroup} at ${request.hospitalName} (${c.distanceKm} km away).`,
+        type: urgency === 'CRITICAL' ? 'CRITICAL_BLOOD_REQUEST' : 'URGENT_BLOOD_REQUEST',
+        priority: urgency === 'CRITICAL' ? 'CRITICAL' : 'URGENT',
+        category: 'MATCH',
+        link: '/donor/requests',
+        actionUrl: '/donor/requests',
+        metadata: {
+          requestId: request.id,
+          bloodGroup: request.bloodGroup,
+          unitsRequired: request.unitsRequired,
+          hospitalName: request.hospitalName,
+          distanceKm: c.distanceKm,
+        },
         sms: {
           to: c.maskedPhone,
           message: `[RakthaSethu Emergency] ${request.bloodGroup} needed at ${request.hospitalName}. Please open RakthaSethu to respond.`,
@@ -341,6 +351,28 @@ export class ProgressiveDonorSearchService {
           description: `Notify attending hospital blood bank coordinator at ${request.hospitalName} for priority cross-match substitutes.`,
         },
       ];
+
+      // Notify nearby verified blood banks of the critical requirement
+      if (urgency === 'CRITICAL') {
+        prisma.bloodBank.findMany({
+          where: { city: request.hospitalCity, verificationStatus: 'VERIFIED' },
+          take: 3,
+        }).then((bloodBanks) => {
+          for (const bb of bloodBanks) {
+            NotificationService.notify({
+              userId: bb.userId,
+              title: `🚨 Emergency Shortage Alert: ${request.bloodGroup} Needed`,
+              message: `Critical shortage escalation: ${request.patientName} urgently needs ${request.unitsRequired} unit(s) of ${request.bloodGroup} at ${request.hospitalName}. Check reserve inventory.`,
+              type: 'BLOOD_BANK_SHORTAGE',
+              priority: 'CRITICAL',
+              category: 'INVENTORY',
+              link: '/bloodbank/inventory',
+              actionUrl: '/bloodbank/inventory',
+              metadata: { requestId: request.id, bloodGroup: request.bloodGroup, hospitalName: request.hospitalName },
+            }).catch(() => {});
+          }
+        }).catch(() => {});
+      }
     }
 
     // Update EmergencySearch and BloodRequest records

@@ -160,7 +160,21 @@ export interface NotificationItem {
   title: string;
   message: string;
   type: string;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'CRITICAL';
+  category?: 'EMERGENCY' | 'MATCH' | 'DONATION' | 'INVENTORY' | 'SYSTEM' | 'ACCOUNT';
   link?: string;
+  actionUrl?: string;
+  metadata?: string;
   isRead: boolean;
+  readAt?: string;
+  expiresAt?: string;
+  deliveryChannel?: string;
   createdAt: string;
+}
+
+export interface NotificationPreferences {
+  inAppAlerts: boolean;
+  soundEnabled: boolean;
+  browserNotifications: boolean;
+  criticalOnly: boolean;
 }

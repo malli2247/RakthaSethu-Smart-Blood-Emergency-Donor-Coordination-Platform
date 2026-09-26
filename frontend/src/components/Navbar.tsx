@@ -14,7 +14,7 @@ import {
   ShieldAlert,
   Globe,
 } from 'lucide-react';
-import { notificationApi } from '../services/api';
+import { NotificationDropdown } from './notifications/NotificationDropdown';
 import { useLanguage } from '../contexts/LanguageContext';
 
 export const Navbar: React.FC = () => {
@@ -23,18 +23,6 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState<number>(0);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      notificationApi
-        .list()
-        .then((res) => {
-          setUnreadCount(res.data?.data?.unreadCount || 0);
-        })
-        .catch(() => {});
-    }
-  }, [isAuthenticated, location.pathname]);
 
   const getDashboardPath = () => {
     if (!user) return '/login';
@@ -156,15 +144,12 @@ export const Navbar: React.FC = () => {
                   Dashboard
                 </Link>
 
+                <NotificationDropdown />
+
                 <div className="relative">
                   <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center text-rose-700 font-bold text-xs border border-rose-200">
                     {user?.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'ME'}
                   </div>
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white text-[10px] font-extrabold rounded-full flex items-center justify-center">
-                      {unreadCount}
-                    </span>
-                  )}
                 </div>
 
                 <button

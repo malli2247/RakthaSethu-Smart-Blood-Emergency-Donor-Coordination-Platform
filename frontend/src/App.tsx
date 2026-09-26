@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import { OfflineBanner } from './components/offline/OfflineBanner';
 import { AppRoutes } from './routes/AppRoutes';
 
@@ -32,8 +33,10 @@ export const App: React.FC = () => {
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>
-            <OfflineBanner />
-            <AppRoutes />
+            <NotificationProvider>
+              <OfflineBanner />
+              <AppRoutes />
+            </NotificationProvider>
           </AuthProvider>
         </LanguageProvider>
       </BrowserRouter>

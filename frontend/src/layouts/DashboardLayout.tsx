@@ -18,28 +18,17 @@ import {
   Compass,
   Radio,
   LogOut,
-  Bell,
   Menu,
   X,
   ExternalLink,
 } from 'lucide-react';
-import { notificationApi } from '../services/api';
+import { NotificationDropdown } from '../components/notifications/NotificationDropdown';
 
 export const DashboardLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    notificationApi
-      .list()
-      .then((res) => {
-        setUnreadCount(res.data?.data?.unreadCount || 0);
-      })
-      .catch(() => {});
-  }, [location.pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -198,16 +187,7 @@ export const DashboardLayout: React.FC = () => {
               Search Compatible Donors
             </Link>
 
-            <div className="relative">
-              <button className="p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100">
-                <Bell className="w-5 h-5" />
-              </button>
-              {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-rose-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-            </div>
+            <NotificationDropdown />
           </div>
         </header>
 

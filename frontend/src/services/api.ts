@@ -123,8 +123,12 @@ export const campaignApi = {
 };
 
 export const notificationApi = {
-  list: () => api.get('/notifications'),
+  list: (params?: { filter?: string; page?: number; limit?: number }) =>
+    api.get('/notifications', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
   markRead: (id: string) => api.patch(`/notifications/${id}/read`),
+  delete: (id: string) => api.delete(`/notifications/${id}`),
+  clearRead: () => api.delete('/notifications/clear-read'),
 };
 
 export const adminApi = {

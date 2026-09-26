@@ -291,11 +291,19 @@ model Notification {
   title                String
   message              String
   type                 String           @default("SYSTEM_NOTICE")
+  priority             String           @default("NORMAL")
+  category             String?          @default("GENERAL")
   link                 String?
+  actionUrl            String?
+  metadata             String?
   isRead               Boolean          @default(false)
+  readAt               DateTime?
+  expiresAt            DateTime?
+  deliveryChannel      String?          @default("IN_APP")
   createdAt            DateTime         @default(now())
 
   @@index([userId, isRead])
+  @@index([priority])
   @@index([createdAt])
 }
 

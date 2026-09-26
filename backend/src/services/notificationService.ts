@@ -2,13 +2,20 @@ import { prisma } from '../config/database';
 import { EmailService } from './emailService';
 import { SmsService } from './smsService';
 import { logger } from '../utils/logger';
+import { RealtimeNotificationService } from './realtimeNotificationService';
 
 export interface DispatchNotificationOptions {
   userId: string;
   title: string;
   message: string;
   type?: string;
+  priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'CRITICAL';
+  category?: 'EMERGENCY' | 'MATCH' | 'DONATION' | 'INVENTORY' | 'SYSTEM' | 'ACCOUNT';
   link?: string;
+  actionUrl?: string;
+  metadata?: Record<string, any>;
+  expiresAt?: Date;
+  deliveryChannel?: 'IN_APP' | 'ALL';
   email?: {
     to: string;
     subject: string;
@@ -22,27 +29,136 @@ export interface DispatchNotificationOptions {
 
 export class NotificationService {
   /**
-   * Dispatches notifications across multiple channels in a non-blocking, resilient manner.
+   * Determine default priority from notification type if not explicitly supplied
    */
-  static async notify(options: DispatchNotificationOptions): Promise<void> {
-    const { userId, title, message, type = 'SYSTEM_NOTICE', link, email, sms } = options;
+  private static resolvePriority(
+    type: string,
+    explicitPriority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'CRITICAL'
+  ): 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'CRITICAL' {
+    if (explicitPriority) return explicitPriority;
 
-    // 1. Create in-app notification in database
+    if (type.includes('CRITICAL') || type === 'EMERGENCY_ALERT') {
+      return 'CRITICAL';
+    }
+    if (type.includes('URGENT') || type.includes('MATCH') || type === 'DONOR_ACCEPTED') {
+      return 'URGENT';
+    }
+    if (type.includes('SHORTAGE') || type.includes('CONFIRMED') || type.includes('FULFILLED')) {
+      return 'HIGH';
+    }
+    return 'NORMAL';
+  }
+
+  /**
+   * Determine default category from notification type
+   */
+  private static resolveCategory(
+    type: string,
+    explicitCategory?: 'EMERGENCY' | 'MATCH' | 'DONATION' | 'INVENTORY' | 'SYSTEM' | 'ACCOUNT'
+  ): string {
+    if (explicitCategory) return explicitCategory;
+
+    if (type.includes('EMERGENCY') || type.includes('CRITICAL') || type.includes('URGENT') || type.includes('BLOOD_REQUEST')) {
+      return 'EMERGENCY';
+    }
+    if (type.includes('MATCH') || type.includes('DONOR')) {
+      return 'MATCH';
+    }
+    if (type.includes('DONATION')) {
+      return 'DONATION';
+    }
+    if (type.includes('INVENTORY') || type.includes('SHORTAGE')) {
+      return 'INVENTORY';
+    }
+    if (type.includes('VERIFICATION') || type.includes('ACCOUNT')) {
+      return 'ACCOUNT';
+    }
+    return 'SYSTEM';
+  }
+
+  /**
+   * Dispatches notifications across multiple channels with anti-spam deduplication and live SSE broadcast.
+   */
+  static async notify(options: DispatchNotificationOptions): Promise<any> {
+    const {
+      userId,
+      title,
+      message,
+      type = 'SYSTEM_NOTICE',
+      link,
+      actionUrl,
+      metadata,
+      expiresAt,
+      deliveryChannel = 'IN_APP',
+      email,
+      sms,
+    } = options;
+
+    const priority = this.resolvePriority(type, options.priority);
+    const category = this.resolveCategory(type, options.category);
+    const targetActionUrl = actionUrl || link || null;
+
+    // 1. Anti-spam deduplication check: avoid creating duplicate unread notifications
+    // within 5 minutes for the same user, type, and title
     try {
-      await prisma.notification.create({
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const duplicate = await prisma.notification.findFirst({
+        where: {
+          userId,
+          type,
+          title,
+          isRead: false,
+          createdAt: { gte: fiveMinutesAgo },
+        },
+      });
+
+      if (duplicate) {
+        logger.info(`[NotificationService] Suppressed duplicate notification for user ${userId} (${type})`);
+        return duplicate;
+      }
+    } catch {
+      // Continue if deduplication check encounters an issue
+    }
+
+    // 2. Persist in-app notification in database
+    let createdNotification: any = null;
+    try {
+      createdNotification = await prisma.notification.create({
         data: {
           userId,
           title,
           message,
           type: type as any,
-          link: link || null,
+          priority,
+          category,
+          link: targetActionUrl,
+          actionUrl: targetActionUrl,
+          metadata: metadata ? JSON.stringify(metadata) : null,
+          expiresAt: expiresAt || null,
+          deliveryChannel,
         },
       });
     } catch (dbErr) {
       logger.error(`[NotificationService] Database notification save failed for user ${userId}`, dbErr);
     }
 
-    // 2. Dispatch Email asynchronously if provided
+    // 3. Immediately broadcast real-time event to active SSE clients
+    if (createdNotification) {
+      try {
+        const unreadCount = await prisma.notification.count({
+          where: { userId, isRead: false },
+        });
+
+        RealtimeNotificationService.sendToUser(userId, 'notification', {
+          notification: createdNotification,
+          unreadCount,
+        });
+      } catch (sseErr) {
+        logger.warn(`[NotificationService] SSE broadcast warning for user ${userId}:`, sseErr);
+      }
+    }
+
+    // 4. Dispatch Email asynchronously if provided
     if (email && email.to) {
       EmailService.sendMail({
         to: email.to,
@@ -53,11 +169,13 @@ export class NotificationService {
       });
     }
 
-    // 3. Dispatch SMS asynchronously if provided
+    // 5. Dispatch SMS asynchronously if provided
     if (sms && sms.to) {
       SmsService.sendSms(sms.to, sms.message).catch((err) => {
         logger.error(`[NotificationService] Asynchronous SMS delivery failed`, err);
       });
     }
+
+    return createdNotification;
   }
 }

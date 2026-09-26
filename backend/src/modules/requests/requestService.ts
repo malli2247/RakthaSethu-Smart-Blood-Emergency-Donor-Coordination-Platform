@@ -245,11 +245,39 @@ export class RequestService {
     // Notify requester with multi-channel notification
     await NotificationService.notify({
       userId: request.requesterId,
-      title: `Blood Request Status Updated`,
+      title: `Blood Request Status Updated: ${nextStatus}`,
       message: `Your request for ${request.patientName} (${request.bloodGroup}) is now: ${nextStatus}.`,
-      type: nextStatus === 'FULFILLED' ? 'REQUEST_FULFILLED' : 'SYSTEM_NOTICE',
+      type: nextStatus === 'FULFILLED' ? 'REQUEST_FULFILLED' : 'REQUEST_STATUS_CHANGED',
+      priority: nextStatus === 'FULFILLED' ? 'HIGH' : 'NORMAL',
+      category: 'EMERGENCY',
       link: `/patient/requests/${requestId}`,
+      actionUrl: `/patient/requests/${requestId}`,
+      metadata: { requestId, nextStatus, patientName: request.patientName },
     });
+
+    // When request is fulfilled, notify matching donors that requirement is resolved
+    if (nextStatus === 'FULFILLED') {
+      prisma.donorMatch.findMany({
+        where: { requestId },
+        include: { donor: true },
+      }).then((matches: any[]) => {
+        for (const m of matches) {
+          if (m.donor?.userId) {
+            NotificationService.notify({
+              userId: m.donor.userId,
+              title: `Request Fulfilled — Thank You!`,
+              message: `The emergency blood request for ${request.patientName} (${request.bloodGroup}) has been successfully fulfilled. Thank you for your humanitarian readiness.`,
+              type: 'REQUEST_FULFILLED',
+              priority: 'NORMAL',
+              category: 'DONATION',
+              link: '/donor/history',
+              actionUrl: '/donor/history',
+              metadata: { requestId, patientName: request.patientName },
+            }).catch(() => {});
+          }
+        }
+      }).catch(() => {});
+    }
 
     return updated;
   }
