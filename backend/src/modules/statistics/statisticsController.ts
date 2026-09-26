@@ -104,11 +104,14 @@ export async function getPublicStatistics(req: Request, res: Response, next: Nex
             where: { status: 'FULFILLED' },
           }),
 
-          // 10. Completed donation records
-          prisma.donation.count(),
+          // 10. Completed & confirmed donation records (Section 46)
+          prisma.donation.count({
+            where: { status: 'CONFIRMED' },
+          }),
 
-          // 11. Blood units donated
+          // 11. Blood units donated from officially confirmed donations
           prisma.donation.aggregate({
+            where: { status: 'CONFIRMED' },
             _sum: { units: true },
           }),
         ]);

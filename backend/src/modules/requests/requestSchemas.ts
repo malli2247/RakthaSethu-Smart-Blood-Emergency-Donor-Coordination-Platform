@@ -1,4 +1,4 @@
-﻿import { z } from 'zod';
+import { z } from 'zod';
 
 const BloodGroupEnum = z.enum([
   'A_POSITIVE',
@@ -15,14 +15,25 @@ const UrgencyEnum = z.enum(['NORMAL', 'HIGH', 'CRITICAL']);
 
 const RequestStatusEnum = z.enum([
   'PENDING',
+  'VALIDATING',
   'MATCHING',
+  'DONORS_FOUND',
   'DONOR_CONTACTED',
   'DONOR_ACCEPTED',
+  'DONOR_TRAVELLING',
+  'DONOR_ARRIVED',
+  'DONATION_STARTED',
+  'DONATION_COMPLETED',
+  'DONATION_VERIFICATION_PENDING',
   'DONATION_CONFIRMED',
+  'BLOOD_RECEIVED',
+  'PARTIALLY_FULFILLED',
   'FULFILLED',
+  'FULFILLMENT_ISSUE',
   'CANCELLED',
   'EXPIRED',
   'REJECTED',
+  'UNABLE_TO_FULFILL',
 ]);
 
 export const createBloodRequestSchema = z.object({

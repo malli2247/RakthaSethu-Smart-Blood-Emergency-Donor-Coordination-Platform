@@ -7,6 +7,8 @@ import {
   verifyOrganization,
   getVerificationRequests,
   getAuditLogs,
+  getStuckRequests,
+  resolveRequestIssue,
 } from './adminController';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -22,3 +24,5 @@ adminRouter.patch('/users/:id/status', updateUserStatus);
 adminRouter.get('/verifications', getVerificationRequests);
 adminRouter.patch('/verifications/:type/:id', verifyOrganization);
 adminRouter.get('/audit-logs', getAuditLogs);
+adminRouter.get('/stuck-requests', getStuckRequests);
+adminRouter.post('/requests/:id/resolve', resolveRequestIssue);

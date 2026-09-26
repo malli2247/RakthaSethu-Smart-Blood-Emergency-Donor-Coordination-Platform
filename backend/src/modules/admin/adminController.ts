@@ -4,6 +4,8 @@ import { sendSuccess, AppError } from '../../utils/response';
 import { recordAuditLog } from '../../utils/auditLogger';
 
 import { CacheService } from '../../services/cacheService';
+import { RequestService } from '../requests/requestService';
+import { MatchingService } from '../matching/matchingService';
 
 export async function getAdminStats(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -320,6 +322,61 @@ export async function getAuditLogs(req: Request, res: Response, next: NextFuncti
       limit: Number(limit),
       totalPages: Math.ceil(total / Number(limit)),
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function getStuckRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const alerts = await RequestService.getStuckRequests();
+    sendSuccess(res, alerts, 'Stuck and delayed request operational alerts');
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function resolveRequestIssue(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { action, notes } = req.body; // 'FORCE_FULFILL' | 'RESTART_MATCHING' | 'CANCEL'
+    const adminId = req.user!.id;
+
+    const request = await prisma.bloodRequest.findUnique({ where: { id } });
+    if (!request) throw new AppError('Request not found', 404);
+
+    if (action === 'FORCE_FULFILL') {
+      await prisma.bloodRequest.update({
+        where: { id },
+        data: {
+          status: 'FULFILLED',
+          additionalNotes: `${request.additionalNotes || ''}\n[Admin Resolution]: Force fulfilled by admin (${notes || 'Manual review verified'})`,
+        },
+      });
+      await recordAuditLog({ userId: adminId, action: 'ADMIN_FORCE_FULFILL_REQUEST', entity: 'BloodRequest', entityId: id, details: notes });
+    } else if (action === 'RESTART_MATCHING') {
+      await prisma.bloodRequest.update({
+        where: { id },
+        data: {
+          status: 'MATCHING',
+          additionalNotes: `${request.additionalNotes || ''}\n[Admin Resolution]: Re-triggered matching`,
+        },
+      });
+      MatchingService.matchRequest(id).catch(() => {});
+      await recordAuditLog({ userId: adminId, action: 'ADMIN_RESTART_MATCHING', entity: 'BloodRequest', entityId: id, details: notes });
+    } else if (action === 'CANCEL') {
+      await prisma.bloodRequest.update({
+        where: { id },
+        data: {
+          status: 'CANCELLED',
+          additionalNotes: `${request.additionalNotes || ''}\n[Admin Resolution]: Cancelled (${notes})`,
+        },
+      });
+      await recordAuditLog({ userId: adminId, action: 'ADMIN_CANCEL_REQUEST', entity: 'BloodRequest', entityId: id, details: notes });
+    }
+
+    CacheService.invalidateByTag('stats');
+    sendSuccess(res, { resolved: true }, `Request resolution recorded: ${action}`);
   } catch (error) {
     next(error);
   }

@@ -81,8 +81,15 @@ export const requestsApi = {
   create: (data: any) => api.post('/requests', data),
   updateStatus: (id: string, data: { status: string; notes?: string }) =>
     api.patch(`/requests/${id}/status`, data),
-  respondToMatch: (matchId: string, action: 'ACCEPT' | 'DECLINE', notes?: string) =>
+  respondToMatch: (matchId: string, action: 'ACCEPT' | 'DECLINE' | 'CANCEL', notes?: string) =>
     api.post(`/requests/matches/${matchId}/respond`, { action, notes }),
+  startTravel: (matchId: string) => api.post(`/requests/matches/${matchId}/start-travel`),
+  markArrived: (matchId: string) => api.post(`/requests/matches/${matchId}/arrived`),
+  confirmReceipt: (
+    id: string,
+    data: { action: 'CONFIRM' | 'NOT_RECEIVED'; notes?: string; reportedIssue?: string }
+  ) => api.post(`/requests/${id}/confirm-receipt`, data),
+  getTimeline: (id: string) => api.get(`/requests/${id}/timeline`),
 };
 
 export const donorApi = {
@@ -98,7 +105,21 @@ export const hospitalApi = {
   getProfile: () => api.get('/hospitals/profile'),
   updateProfile: (data: any) => api.patch('/hospitals/profile', data),
   getRequests: () => api.get('/hospitals/requests'),
-  confirmDonation: (data: any) => api.post('/hospitals/confirm-donation', data),
+  verifyArrival: (data: { requestId: string; donorId: string; staffNotes?: string }) =>
+    api.post('/hospitals/verify-arrival', data),
+  startDonation: (data: { requestId: string; donorId: string; units?: number }) =>
+    api.post('/hospitals/start-donation', data),
+  completeDonation: (data: { requestId: string; donorId: string; donationId?: string; notes?: string }) =>
+    api.post('/hospitals/complete-donation', data),
+  confirmDonation: (data: {
+    requestId: string;
+    donorId: string;
+    units?: number;
+    notes?: string;
+    donationId?: string;
+  }) => api.post('/hospitals/confirm-donation', data),
+  reportIssue: (data: { requestId: string; donorId?: string; issueReason: string }) =>
+    api.post('/hospitals/report-issue', data),
 };
 
 export const bloodBankApi = {
@@ -139,6 +160,11 @@ export const adminApi = {
   getVerifications: () => api.get('/admin/verifications'),
   verifyOrg: (type: string, id: string, data: any) =>
     api.patch(`/admin/verifications/${type}/${id}`, data),
+  getStuckRequests: () => api.get('/admin/stuck-requests'),
+  resolveRequest: (
+    id: string,
+    data: { action: 'FORCE_FULFILL' | 'RESTART_MATCHING' | 'CANCEL'; notes?: string }
+  ) => api.post(`/admin/requests/${id}/resolve`, data),
 };
 
 export const aiApi = {

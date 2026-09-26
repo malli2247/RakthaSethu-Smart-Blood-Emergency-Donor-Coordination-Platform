@@ -22,16 +22,45 @@ export type UrgencyLevel = 'NORMAL' | 'HIGH' | 'CRITICAL';
 
 export type RequestStatus =
   | 'PENDING'
+  | 'VALIDATING'
   | 'MATCHING'
+  | 'DONORS_FOUND'
   | 'DONOR_CONTACTED'
   | 'DONOR_ACCEPTED'
+  | 'DONOR_TRAVELLING'
+  | 'DONOR_ARRIVED'
+  | 'DONATION_STARTED'
+  | 'DONATION_COMPLETED'
+  | 'DONATION_VERIFICATION_PENDING'
   | 'DONATION_CONFIRMED'
+  | 'BLOOD_RECEIVED'
+  | 'PARTIALLY_FULFILLED'
   | 'FULFILLED'
+  | 'FULFILLMENT_ISSUE'
   | 'CANCELLED'
   | 'EXPIRED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'UNABLE_TO_FULFILL';
 
-export type MatchStatus = 'PENDING' | 'NOTIFIED' | 'ACCEPTED' | 'DECLINED' | 'EXPIRED';
+export type MatchStatus =
+  | 'PENDING'
+  | 'NOTIFIED'
+  | 'ACCEPTED'
+  | 'TRAVELLING'
+  | 'ARRIVED'
+  | 'DONATION_STARTED'
+  | 'DONATION_COMPLETED'
+  | 'CONFIRMED'
+  | 'DECLINED'
+  | 'CANCELLED'
+  | 'EXPIRED';
+
+export type DonationStatus =
+  | 'STARTED'
+  | 'COMPLETED'
+  | 'VERIFICATION_PENDING'
+  | 'CONFIRMED'
+  | 'REJECTED';
 
 export type VerificationStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
@@ -100,9 +129,12 @@ export interface BloodRequest {
   contactName: string;
   contactPhone: string;
   status: RequestStatus;
+  unitsFulfilled?: number;
   additionalNotes?: string;
   createdAt: string;
   matches?: DonorMatch[];
+  donations?: DonationRecord[];
+  receipts?: BloodReceipt[];
   _count?: { matches: number };
 }
 
@@ -115,6 +147,8 @@ export interface DonorMatch {
   status: MatchStatus;
   contactedAt: string;
   respondedAt?: string;
+  startedTravellingAt?: string;
+  arrivedAt?: string;
   responseNotes?: string;
   donor?: DonorProfile;
   request?: BloodRequest;
@@ -124,6 +158,39 @@ export interface DonorMatch {
   bloodGroup?: BloodGroup;
   city?: string;
   state?: string;
+}
+
+export interface BloodReceipt {
+  id: string;
+  requestId: string;
+  receiverId: string;
+  unitsReceived: number;
+  confirmed: boolean;
+  confirmedAt?: string;
+  reportedIssue?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface DonationRecord {
+  id: string;
+  donorId: string;
+  requestId?: string;
+  hospitalId?: string;
+  bloodBankId?: string;
+  bloodGroup: BloodGroup;
+  units: number;
+  donationDate: string;
+  certificateCode: string;
+  status: DonationStatus;
+  startedAt?: string;
+  completedAt?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
+  notes?: string;
+  hospital?: { name: string; city: string };
+  bloodBank?: { name: string; city: string };
+  donor?: { fullName: string; bloodGroup: string; user?: { phone?: string; email?: string } };
 }
 
 export interface BloodInventoryItem {

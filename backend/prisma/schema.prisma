@@ -30,6 +30,7 @@ model User {
   notifications    Notification[]
   bloodRequests    BloodRequest[]    @relation("UserBloodRequests")
   organizedCampaigns Campaign[]      @relation("OrganizerCampaigns")
+  bloodReceipts    BloodReceipt[]
 
   @@index([email])
   @@index([role])
@@ -206,12 +207,14 @@ model BloodRequest {
   contactName          String
   contactPhone         String
   status               String        @default("PENDING")
+  unitsFulfilled       Int           @default(0)
   additionalNotes      String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
   matches              DonorMatch[]
   donations            Donation[]
+  receipts             BloodReceipt[]
   searches             EmergencySearch[]
   coordinationRoom     EmergencyCoordinationRoom?
 
@@ -234,6 +237,8 @@ model DonorMatch {
   status               String        @default("PENDING")
   contactedAt          DateTime      @default(now())
   respondedAt          DateTime?
+  startedTravellingAt  DateTime?
+  arrivedAt            DateTime?
   responseNotes        String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
@@ -256,12 +261,35 @@ model Donation {
   units                Int           @default(1)
   donationDate         DateTime      @default(now())
   certificateCode      String        @unique
+  status               String        @default("CONFIRMED")
+  startedAt            DateTime?
+  completedAt          DateTime?
+  verifiedAt           DateTime?
+  verifiedBy           String?
   notes                String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
   @@index([donorId])
   @@index([donationDate])
+  @@index([status])
+}
+
+model BloodReceipt {
+  id                   String        @id @default(uuid())
+  requestId            String
+  request              BloodRequest  @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  receiverId           String
+  receiver             User          @relation(fields: [receiverId], references: [id], onDelete: Cascade)
+  unitsReceived        Int           @default(1)
+  confirmed            Boolean       @default(false)
+  confirmedAt          DateTime?
+  reportedIssue        String?
+  notes                String?
+  createdAt            DateTime      @default(now())
+
+  @@index([requestId])
+  @@index([receiverId])
 }
 
 model BloodInventory {

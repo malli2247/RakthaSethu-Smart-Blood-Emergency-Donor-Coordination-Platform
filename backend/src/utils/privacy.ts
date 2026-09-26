@@ -50,21 +50,46 @@ export function maskEmail(email?: string | null): string {
 }
 
 /**
- * Sanitizes donor profile details based on viewing permissions.
- * Only reveals full contact and address if:
- * - Match is ACCEPTED and viewer is the requester, assigned hospital, or an administrator
- * - Or viewer is the donor themselves
+ * Sanitizes donor profile details based on viewing permissions and configurable donor privacy settings.
+ * Section 5 compliance:
+ * - Before donor acceptance: Anonymous view ("Matched Donor", masked contact).
+ * - After donor acceptance: Respect donor privacy preferences (hidePhoneNumber, hideExactAddress).
+ * - Never expose exact home address or live GPS coordinates to recipients.
  */
 export function sanitizeDonorView(
   donor: any,
-  canViewFullDetails: boolean
+  canViewFullDetails: boolean,
+  isSelf: boolean = false
 ): any {
   if (!donor) return donor;
 
-  if (canViewFullDetails) {
+  if (isSelf) {
     return donor;
   }
 
+  // If viewer is allowed full coordination details (e.g. Hospital or Requester post-acceptance)
+  if (canViewFullDetails) {
+    const showPhone = !donor.hidePhoneNumber;
+    const sanitizedUser = donor.user
+      ? {
+          ...donor.user,
+          phone: showPhone ? donor.user.phone : maskPhoneNumber(donor.user.phone),
+          email: donor.user.email,
+        }
+      : undefined;
+
+    return {
+      ...donor,
+      user: sanitizedUser,
+      address: donor.hideExactAddress
+        ? `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '')
+        : donor.address,
+      latitude: donor.hideExactAddress ? undefined : donor.latitude,
+      longitude: donor.hideExactAddress ? undefined : donor.longitude,
+    };
+  }
+
+  // Anonymous / pre-acceptance view
   const sanitizedUser = donor.user
     ? {
         ...donor.user,
@@ -75,8 +100,9 @@ export function sanitizeDonorView(
 
   return {
     ...donor,
+    fullName: 'Matched Donor',
     user: sanitizedUser,
-    address: `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || 'Address hidden for privacy',
+    address: `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || 'Vicinity only',
     latitude: undefined,
     longitude: undefined,
   };

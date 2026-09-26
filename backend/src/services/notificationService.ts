@@ -178,4 +178,41 @@ export class NotificationService {
 
     return createdNotification;
   }
+
+  /**
+   * Broadcast notification to all users of a specific role, or all active users
+   */
+  static async broadcast(options: {
+    title: string;
+    message: string;
+    type?: string;
+    priority?: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT' | 'CRITICAL';
+    category?: 'EMERGENCY' | 'MATCH' | 'DONATION' | 'INVENTORY' | 'SYSTEM' | 'ACCOUNT';
+    link?: string;
+    actionUrl?: string;
+    targetRole?: string;
+  }) {
+    try {
+      const users = await prisma.user.findMany({
+        where: options.targetRole ? { role: options.targetRole, isActive: true } : { isActive: true },
+        select: { id: true },
+        take: 200,
+      });
+
+      for (const u of users) {
+        NotificationService.notify({
+          userId: u.id,
+          title: options.title,
+          message: options.message,
+          type: options.type || 'SYSTEM_NOTICE',
+          priority: options.priority || 'NORMAL',
+          category: options.category || 'EMERGENCY',
+          link: options.link,
+          actionUrl: options.actionUrl,
+        }).catch(() => {});
+      }
+    } catch (err) {
+      logger.error('[NotificationService] Broadcast error:', err);
+    }
+  }
 }
