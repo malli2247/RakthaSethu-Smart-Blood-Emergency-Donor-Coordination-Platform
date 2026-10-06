@@ -157,8 +157,13 @@ export async function getDonorStats(req: Request, res: Response, next: NextFunct
 
     const requestsReceived = donor.matches.length;
     const requestsAccepted = donor.matches.filter((m) => m.status === 'ACCEPTED').length;
-    const donationsCompleted = donor.donations.length || donor.totalDonations;
-    const livesPotentiallyHelped = donationsCompleted * 3; // 1 whole blood donation can save up to 3 lives
+    const donationsCompleted =
+      donor.donations.filter((d) => d.status === 'CONFIRMED' || d.status === 'COMPLETED').length ||
+      donor.donations.length ||
+      donor.totalDonations;
+    const unitsDonated =
+      donor.donations.reduce((sum, d) => sum + (d.units || 1), 0) || donor.totalDonations;
+    const requestsFulfilled = donor.donations.filter((d) => Boolean(d.requestId)).length;
 
     sendSuccess(res, {
       isAvailable: donor.isAvailable,
@@ -168,7 +173,9 @@ export async function getDonorStats(req: Request, res: Response, next: NextFunct
       requestsReceived,
       requestsAccepted,
       donationsCompleted,
-      livesPotentiallyHelped,
+      unitsDonated,
+      requestsFulfilled,
+      livesPotentiallyHelped: donationsCompleted,
     });
   } catch (error) {
     next(error);
@@ -183,8 +190,15 @@ export async function getDonorMatches(req: Request, res: Response, next: NextFun
       throw new AppError('Donor profile not found', 404);
     }
 
+    const now = new Date();
     const matches = await prisma.donorMatch.findMany({
-      where: { donorId: donor.id },
+      where: {
+        donorId: donor.id,
+        request: {
+          status: { notIn: ['CANCELLED', 'FULFILLED', 'BLOOD_RECEIVED', 'EXPIRED'] },
+          requiredBy: { gte: now },
+        },
+      },
       include: {
         request: {
           select: {

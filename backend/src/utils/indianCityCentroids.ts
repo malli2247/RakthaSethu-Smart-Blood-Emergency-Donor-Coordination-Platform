@@ -59,6 +59,15 @@ export const INDIAN_CITY_CENTROIDS: Record<string, CityCentroid> = {
   visakhapatnam: { city: 'Visakhapatnam', state: 'Andhra Pradesh', latitude: 17.6868, longitude: 83.2185 },
   vijayawada: { city: 'Vijayawada', state: 'Andhra Pradesh', latitude: 16.5062, longitude: 80.6480 },
   guntur: { city: 'Guntur', state: 'Andhra Pradesh', latitude: 16.3067, longitude: 80.4365 },
+  kurnool: { city: 'Kurnool', state: 'Andhra Pradesh', latitude: 15.8281, longitude: 78.0373 },
+  tirupati: { city: 'Tirupati', state: 'Andhra Pradesh', latitude: 13.6288, longitude: 79.4192 },
+  nellore: { city: 'Nellore', state: 'Andhra Pradesh', latitude: 14.4426, longitude: 79.9865 },
+  anantapur: { city: 'Anantapur', state: 'Andhra Pradesh', latitude: 14.6819, longitude: 77.6006 },
+  kadapa: { city: 'Kadapa', state: 'Andhra Pradesh', latitude: 14.4673, longitude: 78.8242 },
+  haridwar: { city: 'Haridwar', state: 'Uttarakhand', latitude: 29.9457, longitude: 78.1642 },
+  rishikesh: { city: 'Rishikesh', state: 'Uttarakhand', latitude: 30.0869, longitude: 78.2676 },
+  roorkee: { city: 'Roorkee', state: 'Uttarakhand', latitude: 29.8543, longitude: 77.8880 },
+  haldwani: { city: 'Haldwani', state: 'Uttarakhand', latitude: 29.2183, longitude: 79.5130 },
 
   // Eastern & Central India
   kolkata: { city: 'Kolkata', state: 'West Bengal', latitude: 22.5726, longitude: 88.3639 },

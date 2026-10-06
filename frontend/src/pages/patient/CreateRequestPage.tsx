@@ -313,8 +313,13 @@ export const CreateRequestPage: React.FC = () => {
       navigate(`/patient/requests/${newRequestId}`);
     } catch (err: any) {
       setIsSearchingNearby(false);
-      setError(err.response?.data?.message || 'Failed to broadcast emergency blood request.');
       setSubmitting(false);
+      if (err.response?.status === 401) {
+        setError('Authentication required. Missing Bearer token. Please sign in to broadcast emergency request.');
+        setAuthModalOpen(true);
+      } else {
+        setError(err.response?.data?.message || 'Failed to broadcast emergency blood request.');
+      }
     }
   };
 
@@ -380,15 +385,31 @@ export const CreateRequestPage: React.FC = () => {
             Step {currentStep} of 7: {STEPS[currentStep - 1].title}
           </span>
           <span className="text-xs font-black text-rose-600">
-            {Math.round((currentStep / 7) * 100)}% Completed
+            {error
+              ? 'Confirmation Paused'
+              : submitting
+              ? 'Broadcasting Emergency...'
+              : currentStep === 7
+              ? 'Review & Confirmation (86%)'
+              : `${Math.max(14, Math.round(((currentStep) / 7) * 100))}% Completed`}
           </span>
         </div>
 
         {/* Bar */}
         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden mb-4">
           <div
-            className="bg-rose-600 h-full rounded-full transition-all duration-300 ease-out"
-            style={{ width: `${(currentStep / 7) * 100}%` }}
+            className={`h-full rounded-full transition-all duration-300 ease-out ${
+              error ? 'bg-amber-500' : 'bg-rose-600'
+            }`}
+            style={{
+              width: `${
+                submitting
+                  ? 100
+                  : currentStep === 7
+                  ? 86
+                  : Math.max(14, Math.round(((currentStep) / 7) * 100))
+              }%`,
+            }}
           />
         </div>
 

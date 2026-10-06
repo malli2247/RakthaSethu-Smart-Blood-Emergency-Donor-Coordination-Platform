@@ -92,17 +92,18 @@ export const AiChatWidget: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50">
+    <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40">
       {!isOpen ? (
         <button
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full shadow-lg shadow-rose-300 hover:shadow-xl hover:scale-105 transition-all"
+          className="flex items-center gap-2 p-3 sm:px-4 sm:py-3 bg-gradient-to-r from-rose-600 to-red-600 text-white rounded-full shadow-lg shadow-rose-300 hover:shadow-xl hover:scale-105 transition-all cursor-pointer"
+          title="Open AI Assistant"
         >
           <Bot className="w-5 h-5 animate-pulse" />
-          <span className="text-sm font-bold">Ask AI Assistant</span>
+          <span className="hidden sm:inline text-sm font-bold">Ask AI Assistant</span>
         </button>
       ) : (
-        <div className="w-96 sm:w-[420px] h-[520px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="w-[calc(100vw-32px)] sm:w-[420px] max-h-[85vh] h-[520px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
           <div className="bg-gradient-to-r from-rose-600 to-red-600 p-4 text-white flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2.5">

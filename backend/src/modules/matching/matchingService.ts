@@ -1,6 +1,7 @@
 import { prisma } from '../../config/database';
 import { canDonateTo, getCompatibleDonorGroups, BloodGroupType, BLOOD_GROUP_LABELS } from '../../utils/compatibility';
 import { calculateDistanceKm } from '../../utils/distance';
+import { getCityCentroid } from '../../utils/indianCityCentroids';
 
 export interface DonorMatchCandidate {
   donorId: string;
@@ -55,6 +56,17 @@ export class MatchingService {
 
     const compatibleGroups = getCompatibleDonorGroups(bloodGroup);
 
+    // Resolve search origin coordinates
+    let searchLat = latitude !== undefined && latitude !== null ? Number(latitude) : undefined;
+    let searchLng = longitude !== undefined && longitude !== null ? Number(longitude) : undefined;
+    if ((searchLat === undefined || searchLng === undefined) && city) {
+      const originCentroid = getCityCentroid(city);
+      if (originCentroid) {
+        searchLat = originCentroid.latitude;
+        searchLng = originCentroid.longitude;
+      }
+    }
+
     // Query active donors with compatible blood group
     const donors = await prisma.donorProfile.findMany({
       where: {
@@ -97,15 +109,40 @@ export class MatchingService {
         }
       }
 
-      // 3. Distance calculation
+      // 3. Precise Distance Calculation & Strict Radius Enforcement
       let distanceKm: number | null = null;
-      if (latitude && longitude && donor.latitude && donor.longitude) {
-        distanceKm = calculateDistanceKm(latitude, longitude, donor.latitude, donor.longitude);
-        if (distanceKm !== null && distanceKm > maxRadiusKm) {
-          continue; // Out of requested radius
+      let donorLat = donor.latitude !== null && donor.latitude !== undefined ? Number(donor.latitude) : undefined;
+      let donorLng = donor.longitude !== null && donor.longitude !== undefined ? Number(donor.longitude) : undefined;
+
+      // If donor does not have precise coordinates, resolve authoritative city centroid
+      if ((donorLat === undefined || donorLng === undefined) && donor.city) {
+        const centroid = getCityCentroid(donor.city);
+        if (centroid) {
+          donorLat = centroid.latitude;
+          donorLng = centroid.longitude;
         }
-      } else if (city && donor.city.toLowerCase() !== city.toLowerCase()) {
-        // Fallback city check if no coordinates
+      }
+
+      if (searchLat !== undefined && searchLng !== undefined) {
+        if (donorLat !== undefined && donorLng !== undefined) {
+          distanceKm = calculateDistanceKm(searchLat, searchLng, donorLat, donorLng);
+          // Strict geospatial radius check: exclude anyone beyond maxRadiusKm
+          if (distanceKm !== null && distanceKm > maxRadiusKm) {
+            continue; // Out of requested radius (e.g. Kurnool when searching Dehradun)
+          }
+        } else {
+          // Donor has unknown location/coordinates: if search origin is defined,
+          // do NOT pretend donor is nearby unless city strictly matches
+          if (city && donor.city.toLowerCase() !== city.toLowerCase()) {
+            continue;
+          }
+        }
+      } else if (city) {
+        // Text-only fallback when search coordinates are completely unavailable
+        // Must strictly match the requested city
+        if (donor.city.toLowerCase() !== city.toLowerCase()) {
+          continue;
+        }
         if (state && donor.state.toLowerCase() !== state.toLowerCase()) {
           continue;
         }

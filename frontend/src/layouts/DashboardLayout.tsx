@@ -28,6 +28,8 @@ import {
   Layers,
   FileText,
   Server,
+  Bell,
+  Settings,
 } from 'lucide-react';
 import { NotificationDropdown } from '../components/notifications/NotificationDropdown';
 
@@ -75,6 +77,7 @@ export const DashboardLayout: React.FC = () => {
           { label: 'Blood Requests', path: '/donor/requests', icon: AlertCircle },
           { label: 'Donation History', path: '/donor/history', icon: History },
           { label: 'My Donor Profile', path: '/donor/profile', icon: User },
+          { label: 'Notifications', path: '/notifications', icon: Bell },
         ];
       case 'PATIENT':
       case 'ATTENDANT':

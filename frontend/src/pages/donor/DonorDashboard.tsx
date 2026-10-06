@@ -170,23 +170,23 @@ export const DonorDashboard: React.FC = () => {
       {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Lives Potentially Helped"
-          value={stats?.livesPotentiallyHelped || 0}
-          subtitle="1 unit can save up to 3 lives"
-          icon={<Heart className="w-5 h-5" />}
-          color="red"
-        />
-        <StatCard
-          title="Total Donations"
+          title="Donations Completed"
           value={stats?.donationsCompleted || 0}
-          subtitle="Confirmed blood donations"
+          subtitle="Verified donation events"
           icon={<Droplets className="w-5 h-5" />}
           color="emerald"
         />
         <StatCard
-          title="Requests Received"
-          value={stats?.requestsReceived || 0}
-          subtitle="Matching notifications"
+          title="Units Donated"
+          value={stats?.unitsDonated || stats?.donationsCompleted || 0}
+          subtitle="Confirmed whole blood units"
+          icon={<Heart className="w-5 h-5" />}
+          color="red"
+        />
+        <StatCard
+          title="Requests Fulfilled"
+          value={stats?.requestsFulfilled || 0}
+          subtitle="Emergency requisitions resolved"
           icon={<Activity className="w-5 h-5" />}
           color="blue"
         />
@@ -195,17 +195,21 @@ export const DonorDashboard: React.FC = () => {
           value={
             profile?.daysUntilEligible > 0
               ? `In ${profile.daysUntilEligible} days`
-              : 'Eligible Today'
+              : 'Eligible Today*'
           }
           subtitle={
             profile?.nextEligibleDate
               ? new Date(profile.nextEligibleDate).toLocaleDateString()
-              : 'Ready to donate'
+              : '*Clinical assessment applies'
           }
           icon={<Calendar className="w-5 h-5" />}
           color="purple"
         />
       </div>
+
+      <p className="text-[11px] text-slate-400 -mt-4 italic">
+        *Eligibility status is subject to on-site hemoglobin, blood pressure, and clinical assessment by medical staff on donation day.
+      </p>
 
       {/* Live Emergency Requests Feed */}
       <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
