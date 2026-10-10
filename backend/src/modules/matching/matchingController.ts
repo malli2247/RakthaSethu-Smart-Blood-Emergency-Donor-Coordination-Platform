@@ -4,6 +4,9 @@ import { sendSuccess, AppError } from '../../utils/response';
 import { prisma } from '../../config/database';
 import { BloodGroupType } from '../../utils/compatibility';
 import { ProgressiveDonorSearchService } from '../../services/progressiveDonorSearchService';
+import { isRareBloodGroup, getBloodGroupRarity, getCoarseDistanceBand } from '../../utils/rareBloodClassification';
+import { toRareDonorMatchDTO, getPrivacySafeCount, MIN_PUBLIC_AGGREGATE_THRESHOLD, PrivacyTier } from '../../utils/privacyTiers';
+import { AntiTriangulationService } from '../../services/antiTriangulationService';
 
 export async function findDonors(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -12,6 +15,26 @@ export async function findDonors(req: Request, res: Response, next: NextFunction
     if (!bloodGroup) {
       throw new AppError('bloodGroup is required', 400);
     }
+
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '127.0.0.1';
+    const userId = req.user?.id;
+
+    // 1. Anti-Triangulation & Anti-Enumeration Evaluation
+    const antiTri = await AntiTriangulationService.evaluateQuery({
+      ip,
+      userId,
+      bloodGroup,
+      latitude: latitude ? parseFloat(latitude) : undefined,
+      longitude: longitude ? parseFloat(longitude) : undefined,
+      city: city as string,
+      radiusKm: maxRadiusKm ? parseFloat(maxRadiusKm) : undefined,
+    });
+
+    if (!antiTri.allowed) {
+      throw new AppError(antiTri.reason || 'Search frequency limit exceeded to protect donor privacy.', 429);
+    }
+
+    const isRare = isRareBloodGroup(bloodGroup);
 
     const candidates = await MatchingService.findRankedDonors({
       bloodGroup: bloodGroup as BloodGroupType,
@@ -24,21 +47,59 @@ export async function findDonors(req: Request, res: Response, next: NextFunction
       limit: limit ? parseInt(limit, 10) : 20,
     });
 
-    // Enforce strict donor privacy: omit phone, address, coordinates, and full identity
-    const sanitized = candidates.map((c) => ({
-      donorId: c.donorId,
+    // RARE BLOOD GROUP PRIVACY ENFORCEMENT (Sections 2, 6, 8, 11)
+    // Never expose individual donor items, raw donor IDs, or exact distances for rare blood groups.
+    if (isRare) {
+      const rarityMeta = getBloodGroupRarity(bloodGroup);
+      const safeCountInfo = getPrivacySafeCount(candidates.length, MIN_PUBLIC_AGGREGATE_THRESHOLD);
+
+      sendSuccess(
+        res,
+        {
+          status: candidates.length > 0 ? 'POTENTIAL_DONOR_IDENTIFIED' : 'MATCHING_IN_PROGRESS',
+          isRareBloodGroup: true,
+          rarityLevel: rarityMeta.rarityLevel,
+          rarityDescription: rarityMeta.description,
+          summary: {
+            bloodGroup,
+            serviceArea: city ? `${city} & regional emergency perimeter` : 'State-wide emergency network',
+            networkAvailability: safeCountInfo.displayValue,
+            privacyLevel: 'MAXIMUM_PRIVACY',
+          },
+          message:
+            candidates.length > 0
+              ? 'Potential compatible rare donors are registered in the regional emergency network. In accordance with clinical privacy protocols, individual identities and locations remain confidential until an authenticated emergency request is broadcast.'
+              : 'Currently no suitable rare donor has been identified in this radius. Broadcast an emergency request to initiate statewide progressive matching.',
+          // Privacy-safe pseudo-candidates without raw donorId or exact km
+          candidates: candidates.map((c, i) => ({
+            matchReference: `VOLUNTEER-${i + 1}`,
+            compatibilityStatus: 'COMPATIBLE',
+            availabilityStatus: c.isAvailable ? 'AVAILABLE' : 'STANDBY',
+            verificationStatus: 'VERIFIED',
+            distanceBand: c.distanceBand,
+            regionLabel: c.city ? `${c.city} Region` : 'Regional Area',
+          })),
+        },
+        candidates.length > 0
+          ? 'Potential compatible rare donors identified in network'
+          : 'Matching in progress'
+      );
+      return;
+    }
+
+    // Standard blood groups: Strip donorId, strip exact km (enforce distanceBand)
+    const sanitized = candidates.map((c, i) => ({
+      matchReference: `DONOR-${i + 1}`,
       bloodGroup: c.bloodGroup,
       bloodGroupLabel: c.bloodGroupLabel,
       city: c.city,
       state: c.state,
-      approximateDistance:
-        c.distanceKm !== null ? `${Math.round(c.distanceKm * 10) / 10} km away` : 'Regional area',
-      distanceKm: c.distanceKm !== null ? Math.round(c.distanceKm * 10) / 10 : null,
+      approximateDistance: c.distanceBand,
+      distanceBand: c.distanceBand,
       isAvailable: c.isAvailable,
       emergencyAvailable: c.emergencyAvailable,
       verifiedStatus: 'VERIFIED',
       isVerified: true,
-      score: c.score,
       totalDonations: c.totalDonations,
     }));
 
@@ -52,6 +113,10 @@ export async function getMatchesForRequest(req: Request, res: Response, next: Ne
   try {
     const { requestId } = req.params;
     const currentUser = req.user;
+
+    if (!currentUser) {
+      throw new AppError('Authentication required to view blood request matches', 401);
+    }
 
     const request = await prisma.bloodRequest.findUnique({
       where: { id: requestId },
@@ -72,6 +137,7 @@ export async function getMatchesForRequest(req: Request, res: Response, next: Ne
           },
           orderBy: { compatibilityScore: 'desc' },
         },
+        coordinationRoom: true,
       },
     });
 
@@ -79,34 +145,47 @@ export async function getMatchesForRequest(req: Request, res: Response, next: Ne
       throw new AppError('Blood request not found', 404);
     }
 
-    // Role-based visibility: Requester, Hospital, or Admin can see details
-    const isOwner = currentUser && (currentUser.id === request.requesterId || currentUser.role === 'ADMIN');
-    
-    // Format matches with privacy controls
+    // IDOR & RBAC Protection: Only Requester, Hospital, or Admin can access matches
+    const isOwner = currentUser.id === request.requesterId;
+    const isHospital = currentUser.role === 'HOSPITAL';
+    const isAdmin = currentUser.role === 'ADMIN' || currentUser.role === 'SUPER_ADMIN';
+
+    if (!isOwner && !isHospital && !isAdmin) {
+      throw new AppError('Access denied: You do not have permission to view matches for this request', 403);
+    }
+
+    // Audit log admin access to sensitive match records (Section 20)
+    if (isAdmin && !isOwner) {
+      await prisma.auditLog.create({
+        data: {
+          userId: currentUser.id,
+          action: 'VIEW_RARE_MATCHES',
+          entity: 'BloodRequest',
+          entityId: request.id,
+          details: `Admin viewed matches for request ${request.id}`,
+          ipAddress: req.ip,
+        },
+      });
+    }
+
+    // Format matches using strict privacy tiers (Section 4 & 11)
     const formattedMatches = request.matches.map((m) => {
       const isAccepted = m.status === 'ACCEPTED';
-      const canViewContact = isOwner || isAccepted;
+      const tier: PrivacyTier = isAccepted ? 'ACCEPTED_COORDINATION' : 'AUTHORIZED_MATCH';
 
-      return {
-        matchId: m.id,
-        donorId: m.donorId,
-        fullName: m.donor.fullName,
-        bloodGroup: m.donor.bloodGroup,
-        city: m.donor.city,
-        state: m.donor.state,
-        distanceKm: m.distanceKm,
-        score: m.compatibilityScore,
-        status: m.status,
-        contactedAt: m.contactedAt,
-        respondedAt: m.respondedAt,
-        responseNotes: m.responseNotes,
-        // Show contact details only if owner or donor accepted
-        phone: canViewContact ? m.donor.user.phone : undefined,
-        maskedPhone: m.donor.user.phone
-          ? `${m.donor.user.phone.slice(0, 4)}****${m.donor.user.phone.slice(-3)}`
-          : 'Hidden for privacy',
-        exactAddress: canViewContact ? m.donor.address : undefined,
-      };
+      return toRareDonorMatchDTO(
+        {
+          id: m.id,
+          requestId: m.requestId,
+          distanceKm: m.distanceKm,
+          status: m.status,
+          contactedAt: m.contactedAt,
+          respondedAt: m.respondedAt,
+          donor: m.donor,
+        },
+        tier,
+        request.coordinationRoom ? { roomId: request.coordinationRoom.id } : null
+      );
     });
 
     sendSuccess(res, {

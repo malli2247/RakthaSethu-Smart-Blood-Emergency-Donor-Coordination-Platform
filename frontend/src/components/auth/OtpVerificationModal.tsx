@@ -128,21 +128,21 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
       : phone;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 relative">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-md w-full p-4 sm:p-8 shadow-2xl border border-slate-200 relative pb-safe">
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors touch-target flex items-center justify-center"
           aria-label="Close"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="text-center space-y-2 mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
-            <ShieldCheck className="w-6 h-6" />
+        <div className="text-center space-y-1.5 mb-5 mt-1 sm:mt-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+            <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">{t('verifyMobileTitle')}</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900">{t('verifyMobileTitle')}</h2>
           <p className="text-xs text-slate-500">
             We sent a 6-digit verification code to{' '}
             <strong className="text-slate-800">{maskedDisplay}</strong>.
@@ -163,9 +163,9 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
           </div>
         )}
 
-        <form onSubmit={handleVerify} className="space-y-6">
+        <form onSubmit={handleVerify} className="space-y-5">
           {/* 6-digit input boxes */}
-          <div className="flex items-center justify-center gap-2 sm:gap-3" onPaste={handlePaste}>
+          <div className="flex items-center justify-center gap-1.5 sm:gap-3" onPaste={handlePaste}>
             {digits.map((digit, idx) => (
               <input
                 key={idx}
@@ -176,7 +176,7 @@ export const OtpVerificationModal: React.FC<OtpVerificationModalProps> = ({
                 value={digit}
                 onChange={(e) => handleDigitChange(idx, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(idx, e)}
-                className="w-11 h-14 sm:w-12 sm:h-14 text-center text-xl font-black rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 bg-slate-50 text-slate-900 shadow-2xs"
+                className="w-10 h-12 sm:w-12 sm:h-14 text-center text-lg sm:text-xl font-black rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-rose-500 bg-slate-50 text-slate-900 shadow-2xs"
               />
             ))}
           </div>

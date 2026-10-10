@@ -88,7 +88,7 @@ export const ResetPasswordPage: React.FC = () => {
         </div>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-200 shadow-sm space-y-6">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />

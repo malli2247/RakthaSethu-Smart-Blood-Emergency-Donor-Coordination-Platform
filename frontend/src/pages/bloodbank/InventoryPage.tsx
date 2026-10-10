@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { bloodBankApi } from '../../services/api';
 import { BloodGroupBadge } from '../../components/BloodGroupBadge';
 import { BloodGroup, ComponentType } from '../../types';
@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Calendar,
 } from 'lucide-react';
+import { ResponsiveTable, Column } from '../../components/common/ResponsiveTable';
 
 export const InventoryPage: React.FC = () => {
   const [inventory, setInventory] = useState<any>(null);
@@ -71,6 +72,73 @@ export const InventoryPage: React.FC = () => {
     }
   };
 
+  const columns: Column<any>[] = [
+    {
+      header: 'Batch Number',
+      accessor: (row) => <span className="font-mono font-bold text-slate-800">{row.batchNumber}</span>,
+    },
+    {
+      header: 'Blood Group',
+      accessor: (row) => <BloodGroupBadge bloodGroup={row.bloodGroup} size="sm" />,
+    },
+    {
+      header: 'Component Type',
+      accessor: (row) => <span className="font-semibold text-slate-700">{row.componentType.replace(/_/g, ' ')}</span>,
+    },
+    {
+      header: 'Units',
+      accessor: (row) => <span className="font-black text-slate-900">{row.units} Units</span>,
+    },
+    {
+      header: 'Collection Date',
+      accessor: (row) => <span className="text-slate-500">{new Date(row.collectionDate).toLocaleDateString()}</span>,
+    },
+    {
+      header: 'Expiry Date',
+      accessor: (row) => {
+        const isExpiringSoon = new Date(row.expiryDate).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
+        return (
+          <span className={`inline-flex items-center gap-1 ${isExpiringSoon ? 'text-rose-600 font-bold' : 'text-slate-600'}`}>
+            {isExpiringSoon && <AlertTriangle className="w-3.5 h-3.5" />}
+            {new Date(row.expiryDate).toLocaleDateString()}
+          </span>
+        );
+      },
+    },
+    {
+      header: 'Status',
+      accessor: (row) => (
+        <span
+          className={`px-2.5 py-0.5 rounded-md text-xs font-bold ${
+            row.status === 'AVAILABLE'
+              ? 'bg-emerald-50 text-emerald-700'
+              : row.status === 'RESERVED'
+              ? 'bg-blue-50 text-blue-700'
+              : 'bg-rose-50 text-rose-700'
+          }`}
+        >
+          {row.status}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions',
+      className: 'text-right',
+      accessor: (row) => (
+        <select
+          value={row.status}
+          onChange={(e) => handleUpdateStatus(row.id, e.target.value)}
+          className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-semibold bg-white"
+        >
+          <option value="AVAILABLE">Available</option>
+          <option value="RESERVED">Reserved</option>
+          <option value="EXPIRED">Expired</option>
+          <option value="DISCARDED">Discarded</option>
+        </select>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -97,87 +165,89 @@ export const InventoryPage: React.FC = () => {
         </div>
       )}
 
-      {/* Inventory Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase">
-                <th className="p-4">Batch Number</th>
-                <th className="p-4">Blood Group</th>
-                <th className="p-4">Component Type</th>
-                <th className="p-4">Units</th>
-                <th className="p-4">Collection Date</th>
-                <th className="p-4">Expiry Date</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {inventory?.items?.map((item: any) => {
-                const isExpiringSoon =
-                  new Date(item.expiryDate).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
+      {/* Inventory Responsive Table / Cards */}
+      <ResponsiveTable
+        columns={columns}
+        data={inventory?.items || []}
+        isLoading={loading}
+        keyExtractor={(item: any) => item.id}
+        emptyState={
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+            <Package className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-800">No Inventory Batches Found</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Add refrigerated whole blood or component batches to begin tracking stock.
+            </p>
+          </div>
+        }
+        renderMobileCard={(item: any) => {
+          const isExpiringSoon =
+            new Date(item.expiryDate).getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
 
-                return (
-                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="p-4 font-mono font-bold text-slate-800">{item.batchNumber}</td>
-                    <td className="p-4">
-                      <BloodGroupBadge bloodGroup={item.bloodGroup} size="sm" />
-                    </td>
-                    <td className="p-4 font-semibold text-slate-700">
-                      {item.componentType.replace(/_/g, ' ')}
-                    </td>
-                    <td className="p-4 font-black text-slate-900">{item.units} Units</td>
-                    <td className="p-4 text-slate-500">
-                      {new Date(item.collectionDate).toLocaleDateString()}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center gap-1 ${
-                          isExpiringSoon ? 'text-rose-600 font-bold' : 'text-slate-600'
-                        }`}
-                      >
-                        {isExpiringSoon && <AlertTriangle className="w-3.5 h-3.5" />}
-                        {new Date(item.expiryDate).toLocaleDateString()}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-md text-xs font-bold ${
-                          item.status === 'AVAILABLE'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : item.status === 'RESERVED'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-rose-50 text-rose-700'
-                        }`}
-                      >
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right">
-                      <select
-                        value={item.status}
-                        onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
-                        className="px-2 py-1 rounded-lg border border-slate-200 text-xs font-semibold bg-white"
-                      >
-                        <option value="AVAILABLE">Available</option>
-                        <option value="RESERVED">Reserved</option>
-                        <option value="EXPIRED">Expired</option>
-                        <option value="DISCARDED">Discarded</option>
-                      </select>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          return (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BloodGroupBadge bloodGroup={item.bloodGroup} size="sm" />
+                  <span className="font-mono font-bold text-slate-800 text-xs">{item.batchNumber}</span>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                    item.status === 'AVAILABLE'
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : item.status === 'RESERVED'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'bg-rose-50 text-rose-700'
+                  }`}
+                >
+                  {item.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Component</span>
+                  <span className="font-semibold text-slate-700">{item.componentType.replace(/_/g, ' ')}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Stock</span>
+                  <span className="font-black text-slate-900">{item.units} Units</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Collected</span>
+                  <span className="text-slate-600">{new Date(item.collectionDate).toLocaleDateString()}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold block">Expiry</span>
+                  <span className={`inline-flex items-center gap-1 ${isExpiringSoon ? 'text-rose-600 font-bold' : 'text-slate-600'}`}>
+                    {isExpiringSoon && <AlertTriangle className="w-3 h-3 text-rose-500" />}
+                    {new Date(item.expiryDate).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500">Update Status:</span>
+                <select
+                  value={item.status}
+                  onChange={(e) => handleUpdateStatus(item.id, e.target.value)}
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold bg-slate-50 text-slate-800"
+                >
+                  <option value="AVAILABLE">Available</option>
+                  <option value="RESERVED">Reserved</option>
+                  <option value="EXPIRED">Expired</option>
+                  <option value="DISCARDED">Discarded</option>
+                </select>
+              </div>
+            </div>
+          );
+        }}
+      />
 
       {/* Add Batch Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-xl space-y-5">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 max-w-md w-full border border-slate-200 shadow-xl space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-slate-900">Add Blood Inventory Batch</h3>
               <button

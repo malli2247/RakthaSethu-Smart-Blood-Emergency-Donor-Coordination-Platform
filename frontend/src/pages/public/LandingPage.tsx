@@ -879,7 +879,7 @@ export const LandingPage: React.FC = () => {
 
       {/* Call to action card */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-        <div className="rounded-3xl bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 p-8 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl shadow-rose-900/20">
+        <div className="rounded-2xl sm:rounded-3xl bg-gradient-to-r from-rose-600 via-rose-700 to-red-800 p-6 sm:p-12 text-white flex flex-col md:flex-row items-center justify-between gap-8 shadow-xl shadow-rose-900/20">
           <div className="space-y-3 text-center md:text-left">
             <h3 className="text-2xl sm:text-3xl font-black">
               Ready to help save a life in an emergency?
@@ -891,7 +891,7 @@ export const LandingPage: React.FC = () => {
           </div>
           <Link
             to="/register?role=DONOR"
-            className="px-8 py-4 rounded-xl bg-white text-rose-700 font-extrabold hover:bg-rose-50 shadow-lg whitespace-nowrap transition-transform active:scale-95"
+            className="w-full md:w-auto inline-flex items-center justify-center px-8 py-4 rounded-xl bg-white text-rose-700 font-extrabold hover:bg-rose-50 shadow-lg whitespace-nowrap transition-transform active:scale-95 touch-target"
           >
             Register as Blood Donor
           </Link>

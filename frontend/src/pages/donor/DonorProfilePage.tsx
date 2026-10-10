@@ -1,15 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { donorApi } from '../../services/api';
-import { BloodGroupBadge } from '../../components/BloodGroupBadge';
-import { User, Heart, MapPin, ShieldCheck, CheckCircle2, AlertCircle, Phone, ShieldAlert, Lock } from 'lucide-react';
+import {
+  User,
+  Heart,
+  MapPin,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Phone,
+  ChevronDown,
+  Save,
+  Bell,
+  Lock,
+} from 'lucide-react';
 import { BloodGroup } from '../../types';
 import { OtpVerificationModal } from '../../components/auth/OtpVerificationModal';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const DonorProfilePage: React.FC = () => {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // Collapsible accordion state for mobile
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    personal: true,
+    contact: true,
+    verification: true,
+    preferences: true,
+    privacy: false,
+    notifications: false,
+  });
+
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   const [fullName, setFullName] = useState('');
   const [bloodGroup, setBloodGroup] = useState<BloodGroup>('O_POSITIVE');
@@ -25,6 +52,10 @@ export const DonorProfilePage: React.FC = () => {
   const [hidePhoneNumber, setHidePhoneNumber] = useState(false);
   const [hideExactAddress, setHideExactAddress] = useState(true);
 
+  // Rare blood matching consent
+  const [rareBloodConsent, setRareBloodConsent] = useState(true);
+  const [criticalAlertsEnabled, setCriticalAlertsEnabled] = useState(true);
+
   const loadProfile = () => {
     donorApi
       .getProfile()
@@ -32,18 +63,20 @@ export const DonorProfilePage: React.FC = () => {
         const d = res.data?.data;
         if (d) {
           setProfile(d);
-          setFullName(d.fullName);
-          setBloodGroup(d.bloodGroup);
-          setGender(d.gender);
+          setFullName(d.fullName || '');
+          setBloodGroup(d.bloodGroup || 'O_POSITIVE');
+          setGender(d.gender || 'MALE');
           setPhone(d.user?.phone || '');
           setIsVerified(Boolean(d.isPhoneVerified || d.user?.isPhoneVerified));
-          setCity(d.city);
-          setState(d.state);
-          setAddress(d.address);
-          setIsAvailable(d.isAvailable);
-          setEmergencyAvailable(d.emergencyAvailable);
-          setHidePhoneNumber(d.hidePhoneNumber);
-          setHideExactAddress(d.hideExactAddress);
+          setCity(d.city || '');
+          setState(d.state || '');
+          setAddress(d.address || '');
+          setIsAvailable(d.isAvailable !== false);
+          setEmergencyAvailable(d.emergencyAvailable !== false);
+          setHidePhoneNumber(Boolean(d.hidePhoneNumber));
+          setHideExactAddress(d.hideExactAddress !== false);
+          setRareBloodConsent(d.rareBloodMatchingConsent !== false);
+          setCriticalAlertsEnabled(d.criticalAlertsEnabled !== false);
         }
       })
       .catch((err) => console.error(err))
@@ -70,12 +103,14 @@ export const DonorProfilePage: React.FC = () => {
         emergencyAvailable,
         hidePhoneNumber,
         hideExactAddress,
+        rareBloodMatchingConsent: rareBloodConsent,
+        criticalAlertsEnabled,
       });
       setMessage('Profile settings updated successfully!');
       loadProfile();
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Failed to update profile');
+      setMessage(err.response?.data?.message || t('somethingWentWrong'));
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setSaving(false);
@@ -83,246 +118,369 @@ export const DonorProfilePage: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="h-64 bg-white rounded-2xl animate-pulse" />;
+    return (
+      <div className="space-y-4 max-w-4xl mx-auto">
+        <div className="h-28 bg-white rounded-3xl animate-pulse" />
+        <div className="h-64 bg-white rounded-3xl animate-pulse" />
+      </div>
+    );
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-black text-slate-900">Donor Profile & Privacy Settings</h1>
+        <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+          {t('profile')} & {t('settings')}
+        </h1>
         <p className="text-xs text-slate-500">
-          Manage your availability, personal info, and contact privacy preferences.
+          Manage your personal details, verified mobile, and confidential privacy preferences.
         </p>
       </div>
 
       {message && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          {message}
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{message}</span>
         </div>
       )}
 
-      <form onSubmit={handleSave} className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Legal Name *</label>
-            <input
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Blood Group *</label>
-            <select
-              value={bloodGroup}
-              onChange={(e) => setBloodGroup(e.target.value as BloodGroup)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300 font-bold text-rose-700"
-            >
-              <option value="O_NEGATIVE">O- (Universal Donor)</option>
-              <option value="O_POSITIVE">O+</option>
-              <option value="A_POSITIVE">A+</option>
-              <option value="A_NEGATIVE">A-</option>
-              <option value="B_POSITIVE">B+</option>
-              <option value="B_NEGATIVE">B-</option>
-              <option value="AB_POSITIVE">AB+ (Universal Recipient)</option>
-              <option value="AB_NEGATIVE">AB-</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Gender *</label>
-            <select
-              value={gender}
-              onChange={(e) => setGender(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-            >
-              <option value="MALE">Male</option>
-              <option value="FEMALE">Female</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">City *</label>
-            <input
-              type="text"
-              required
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">State *</label>
-            <input
-              type="text"
-              required
-              value={state}
-              onChange={(e) => setState(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Area / Address *</label>
-            <input
-              type="text"
-              required
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-xl border border-slate-300"
-            />
-          </div>
-        </div>
-
-        {/* Mobile Number & OTP Verification */}
-        <div className="pt-4 border-t border-slate-100 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-              <Phone className="w-4 h-4 text-rose-600" />
-              Registered Mobile Number & Verification
-            </h3>
-            {isVerified ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                ✓ Verified
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
-                ⚠ Not verified
-              </span>
-            )}
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="flex-1 w-full sm:w-auto">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Primary Mobile Number
-              </label>
-              <input
-                type="tel"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setIsVerified(false);
-                }}
-                placeholder="+91 98765 43210"
-                className="w-full max-w-sm px-3 py-2 text-sm rounded-xl border border-slate-300 bg-white"
-              />
-              {!isVerified && (
-                <p className="text-[11px] text-amber-700 font-medium mt-1">
-                  Verify your mobile number to receive blood-request notifications and participate in donor matching.
-                </p>
-              )}
+      <form onSubmit={handleSave} className="space-y-4">
+        {/* ============================================================ */}
+        {/* SECTION 1: PERSONAL INFORMATION */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('personal')}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                <User className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{t('personalInfo')}</h3>
+                <p className="text-[11px] text-slate-500">Name, legal identity, and blood group</p>
+              </div>
             </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openSections.personal ? 'rotate-180' : ''}`} />
+          </button>
 
-            <button
-              type="button"
-              disabled={!phone || phone.length < 10}
-              onClick={() => setOtpModalOpen(true)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-colors ${
-                isVerified
-                  ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                  : 'bg-rose-600 text-white hover:bg-rose-700 shadow-sm'
-              }`}
-            >
-              {isVerified ? 'Re-verify with OTP' : 'Verify via OTP'}
-            </button>
-          </div>
+          {openSections.personal && (
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Legal Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Blood Group *</label>
+                <select
+                  value={bloodGroup}
+                  onChange={(e) => setBloodGroup(e.target.value as BloodGroup)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white font-bold text-rose-700"
+                >
+                  <option value="O_NEGATIVE">O- (Universal Donor)</option>
+                  <option value="O_POSITIVE">O+</option>
+                  <option value="A_POSITIVE">A+</option>
+                  <option value="A_NEGATIVE">A-</option>
+                  <option value="B_POSITIVE">B+</option>
+                  <option value="B_NEGATIVE">B-</option>
+                  <option value="AB_POSITIVE">AB+ (Universal Recipient)</option>
+                  <option value="AB_NEGATIVE">AB-</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Gender *</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                >
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Availability & Emergency */}
-        <div className="pt-4 border-t border-slate-100 space-y-3">
-          <h3 className="text-sm font-bold text-slate-900">Donation Availability Preferences</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isAvailable}
-                onChange={(e) => setIsAvailable(e.target.checked)}
-                className="w-4 h-4 text-rose-600 rounded"
-              />
-              <div>
-                <span className="text-xs font-bold text-slate-900 block">General Availability</span>
-                <span className="text-[11px] text-slate-500">
-                  Allow platform to match you with routine and high priority requests.
-                </span>
+        {/* ============================================================ */}
+        {/* SECTION 2: CONTACT & LOCATION */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('contact')}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <MapPin className="w-4 h-4" />
               </div>
-            </label>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{t('contactInfo')}</h3>
+                <p className="text-[11px] text-slate-500">City, regional perimeter, and general address</p>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openSections.contact ? 'rotate-180' : ''}`} />
+          </button>
 
-            <label className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={emergencyAvailable}
-                onChange={(e) => setEmergencyAvailable(e.target.checked)}
-                className="w-4 h-4 text-rose-600 rounded"
-              />
+          {openSections.contact && (
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-3">
               <div>
-                <span className="text-xs font-bold text-slate-900 block">
-                  Critical Emergency Readiness
-                </span>
-                <span className="text-[11px] text-slate-500">
-                  Receive high-priority alerts for life-threatening acute hemorrhage/trauma cases.
-                </span>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">City / District *</label>
+                <input
+                  type="text"
+                  required
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                />
               </div>
-            </label>
-          </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">State *</label>
+                <input
+                  type="text"
+                  required
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">General Vicinity / Area *</label>
+                <input
+                  type="text"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Privacy Settings */}
-        <div className="pt-4 border-t border-slate-100 space-y-3">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            Contact & Location Privacy
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hidePhoneNumber}
-                onChange={(e) => setHidePhoneNumber(e.target.checked)}
-                className="w-4 h-4 text-rose-600 rounded"
-              />
-              <div>
-                <span className="text-xs font-bold text-slate-900 block">Mask Phone Number</span>
-                <span className="text-[11px] text-slate-500">
-                  Only show phone number to the hospital after you explicitly accept.
-                </span>
+        {/* ============================================================ */}
+        {/* SECTION 3: MOBILE VERIFICATION */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('verification')}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <Phone className="w-4 h-4" />
               </div>
-            </label>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  {t('verificationSection')}
+                  {isVerified ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✓ Verified
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                      ⚠ Unverified
+                    </span>
+                  )}
+                </h3>
+                <p className="text-[11px] text-slate-500">OTP-verified mobile number for emergency notifications</p>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openSections.verification ? 'rotate-180' : ''}`} />
+          </button>
 
-            <label className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hideExactAddress}
-                onChange={(e) => setHideExactAddress(e.target.checked)}
-                className="w-4 h-4 text-rose-600 rounded"
-              />
-              <div>
-                <span className="text-xs font-bold text-slate-900 block">Hide Exact Address</span>
-                <span className="text-[11px] text-slate-500">
-                  Show approximate city & radius instead of house/street number.
-                </span>
+          {openSections.verification && (
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 mt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex-1 w-full sm:w-auto">
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Primary Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    setIsVerified(false);
+                  }}
+                  placeholder="+91 98765 43210"
+                  className="w-full max-w-sm px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-slate-50 focus:bg-white"
+                />
               </div>
-            </label>
-          </div>
+
+              <button
+                type="button"
+                disabled={!phone || phone.length < 10}
+                onClick={() => setOtpModalOpen(true)}
+                className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer touch-target flex items-center justify-center ${
+                  isVerified
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-rose-600 text-white hover:bg-rose-700 shadow-xs'
+                }`}
+              >
+                {isVerified ? 'Re-verify OTP' : t('verifyOtp')}
+              </button>
+            </div>
+          )}
         </div>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow transition-colors"
-        >
-          {saving ? 'Saving changes...' : 'Save Profile Changes'}
-        </button>
+        {/* ============================================================ */}
+        {/* SECTION 4: DONATION PREFERENCES */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('preferences')}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                <Heart className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Donation Availability Preferences</h3>
+                <p className="text-[11px] text-slate-500">General matching queue and trauma readiness</p>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openSections.preferences ? 'rotate-180' : ''}`} />
+          </button>
+
+          {openSections.preferences && (
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAvailable}
+                  onChange={(e) => setIsAvailable(e.target.checked)}
+                  className="w-4 h-4 text-rose-600 rounded"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block">{t('availableToDonate')}</span>
+                  <span className="text-[11px] text-slate-500">
+                    Allow platform to match you with routine requests.
+                  </span>
+                </div>
+              </label>
+
+              <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emergencyAvailable}
+                  onChange={(e) => setEmergencyAvailable(e.target.checked)}
+                  className="w-4 h-4 text-rose-600 rounded"
+                />
+                <div>
+                  <span className="text-xs font-bold text-slate-900 block">Critical Emergency Readiness</span>
+                  <span className="text-[11px] text-slate-500">
+                    Receive high-priority alerts for life-threatening acute hemorrhage cases.
+                  </span>
+                </div>
+              </label>
+            </div>
+          )}
+        </div>
+
+        {/* ============================================================ */}
+        {/* SECTION 5: PRIVACY & RARE BLOOD CONSENT */}
+        {/* ============================================================ */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs overflow-hidden">
+          <button
+            type="button"
+            onClick={() => toggleSection('privacy')}
+            className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">{t('privacyPreferences')}</h3>
+                <p className="text-[11px] text-slate-500">Anti-triangulation, location masking, and rare blood consent</p>
+              </div>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${openSections.privacy ? 'rotate-180' : ''}`} />
+          </button>
+
+          {openSections.privacy && (
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 mt-3 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hidePhoneNumber}
+                    onChange={(e) => setHidePhoneNumber(e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 block">Mask Phone Number</span>
+                    <span className="text-[11px] text-slate-500">
+                      Only reveal phone to coordinator after you accept.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideExactAddress}
+                    onChange={(e) => setHideExactAddress(e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-slate-900 block">Coarse Perimeter Only</span>
+                    <span className="text-[11px] text-slate-500">
+                      Never reveal exact street coordinates publicly.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              {/* Rare Blood Consent */}
+              <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200 space-y-2">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rareBloodConsent}
+                    onChange={(e) => setRareBloodConsent(e.target.checked)}
+                    className="w-4 h-4 text-rose-600 rounded mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold text-rose-950 block">{t('rareBloodConsent')}</span>
+                    <span className="text-[11px] text-rose-800 leading-relaxed block mt-0.5">
+                      {t('rareConsentDesc')}
+                    </span>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Submit Save Button */}
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="w-full sm:w-auto px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer touch-target"
+          >
+            <Save className="w-4 h-4" />
+            <span>{saving ? t('loading') : t('save')}</span>
+          </button>
+        </div>
       </form>
 
       <OtpVerificationModal
@@ -332,7 +490,7 @@ export const DonorProfilePage: React.FC = () => {
         onVerified={() => {
           setIsVerified(true);
           loadProfile();
-          setMessage('Mobile number verified successfully via OTP!');
+          setMessage(t('otpSuccessMessage'));
           setTimeout(() => setMessage(null), 3000);
         }}
       />

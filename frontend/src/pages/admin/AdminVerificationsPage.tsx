@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { adminApi } from '../../services/api';
 import { ShieldCheck, Building2, Droplets, Check, X, CheckCircle2 } from 'lucide-react';
 
@@ -51,7 +51,7 @@ export const AdminVerificationsPage: React.FC = () => {
       )}
 
       {/* Hospitals Section */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <Building2 className="w-5 h-5 text-indigo-600" />
           Pending Hospitals ({verifications.hospitals?.length || 0})
@@ -71,16 +71,16 @@ export const AdminVerificationsPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => handleVerify('hospital', h.id, 'VERIFIED')}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 touch-target"
                   >
                     <Check className="w-4 h-4" /> Approve License
                   </button>
                   <button
                     onClick={() => handleVerify('hospital', h.id, 'REJECTED')}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-rose-600 hover:bg-rose-50 font-bold text-xs"
+                    className="w-full sm:w-auto px-3 py-2.5 rounded-xl border border-slate-200 text-rose-600 hover:bg-rose-50 font-bold text-xs flex items-center justify-center touch-target"
                   >
                     Reject
                   </button>
@@ -94,7 +94,7 @@ export const AdminVerificationsPage: React.FC = () => {
       </div>
 
       {/* Blood Banks Section */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 border border-slate-200 shadow-sm space-y-4">
         <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
           <Droplets className="w-5 h-5 text-purple-600" />
           Pending Blood Banks ({verifications.bloodBanks?.length || 0})
@@ -114,16 +114,16 @@ export const AdminVerificationsPage: React.FC = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => handleVerify('blood-bank', bb.id, 'VERIFIED')}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center gap-1.5"
+                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-1.5 touch-target"
                   >
                     <Check className="w-4 h-4" /> Approve License
                   </button>
                   <button
                     onClick={() => handleVerify('blood-bank', bb.id, 'REJECTED')}
-                    className="px-3 py-2 rounded-xl border border-slate-200 text-rose-600 hover:bg-rose-50 font-bold text-xs"
+                    className="w-full sm:w-auto px-3 py-2.5 rounded-xl border border-slate-200 text-rose-600 hover:bg-rose-50 font-bold text-xs flex items-center justify-center touch-target"
                   >
                     Reject
                   </button>

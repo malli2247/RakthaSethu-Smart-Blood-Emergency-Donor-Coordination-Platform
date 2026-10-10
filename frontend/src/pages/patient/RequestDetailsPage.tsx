@@ -156,10 +156,10 @@ export const RequestDetailsPage: React.FC = () => {
       )}
 
       {/* Main Request Summary Card */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <BloodGroupBadge bloodGroup={request.bloodGroup} />
               <UrgencyBadge urgency={request.urgency} />
               <StatusBadge status={request.status} />
@@ -177,10 +177,10 @@ export const RequestDetailsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <Link
               to={`/emergency/search/${request.id}`}
-              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm"
+              className="w-full sm:w-auto text-center px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition shadow-sm touch-target"
             >
               Emergency Search Live
             </Link>
@@ -217,7 +217,7 @@ export const RequestDetailsPage: React.FC = () => {
 
       {/* Section 13, 14, 15, 16, 17: Interactive Receiver Blood Receipt Confirmation Box */}
       {isDonationConfirmed && !isFulfilled && (
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-3xl p-6 sm:p-8 border border-emerald-200 shadow-sm space-y-4">
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 border border-emerald-200 shadow-sm space-y-4">
           <div className="flex items-start gap-4">
             <div className="p-3 bg-emerald-600 text-white rounded-2xl">
               <ShieldCheck className="w-6 h-6" />
@@ -233,11 +233,11 @@ export const RequestDetailsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
             <button
               onClick={handleConfirmBloodReceived}
               disabled={submittingAction || isReceiptConfirmed}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs shadow-sm flex items-center gap-2 transition"
+              className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white font-black text-xs shadow-sm flex items-center justify-center gap-2 transition touch-target"
             >
               <CheckCircle2 className="w-4 h-4" />
               {isReceiptConfirmed ? 'Receipt Confirmed' : 'YES, BLOOD RECEIVED'}
@@ -246,7 +246,7 @@ export const RequestDetailsPage: React.FC = () => {
             <button
               onClick={() => setShowIssueModal(true)}
               disabled={submittingAction}
-              className="px-4 py-2.5 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center gap-1.5 transition"
+              className="w-full sm:w-auto px-4 py-3 rounded-xl border border-rose-300 text-rose-700 hover:bg-rose-50 font-bold text-xs flex items-center justify-center gap-1.5 transition touch-target"
             >
               <AlertTriangle className="w-4 h-4 text-rose-600" />
               NO / NOT YET — REPORT A PROBLEM
@@ -272,7 +272,7 @@ export const RequestDetailsPage: React.FC = () => {
       <RequestLifecycleTimeline requestId={request.id} currentStatus={request.status} />
 
       {/* Matched Donors Section with Section 5 Privacy Enforcement */}
-      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
@@ -364,7 +364,7 @@ export const RequestDetailsPage: React.FC = () => {
       {/* Problem Report Modal */}
       {showIssueModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
             <div className="flex items-center gap-2 text-rose-600">
               <AlertTriangle className="w-6 h-6" />
               <h3 className="text-lg font-black text-slate-900">Report Blood Delivery Issue</h3>

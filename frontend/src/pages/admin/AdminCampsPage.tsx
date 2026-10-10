@@ -201,7 +201,7 @@ export const AdminCampsPage: React.FC = () => {
       )}
 
       {/* Header & Quick Action Buttons */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 sm:p-6 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs">
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-bold uppercase tracking-wider mb-2">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -215,11 +215,11 @@ export const AdminCampsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
           <button
             onClick={handleTriggerSync}
             disabled={isSyncing}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-2xs transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-800 font-bold text-xs shadow-2xs transition-colors disabled:opacity-50 touch-target"
           >
             <RefreshCw className={`w-3.5 h-3.5 text-rose-600 ${isSyncing ? 'animate-spin' : ''}`} />
             {isSyncing ? 'Synchronizing...' : 'Sync e-RaktKosh'}
@@ -227,7 +227,7 @@ export const AdminCampsPage: React.FC = () => {
 
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-colors touch-target"
           >
             <Upload className="w-3.5 h-3.5" />
             Import Official Data
@@ -283,7 +283,7 @@ export const AdminCampsPage: React.FC = () => {
       </div>
 
       {/* Tabs and Search Controls */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xs p-6 space-y-6">
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-2xs p-4 sm:p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
             {[

@@ -67,43 +67,50 @@ export function sanitizeDonorView(
     return donor;
   }
 
-  // If viewer is allowed full coordination details (e.g. Hospital or Requester post-acceptance)
+  // If viewer is allowed full coordination details post-acceptance (e.g. Requester or Hospital)
   if (canViewFullDetails) {
     const showPhone = !donor.hidePhoneNumber;
     const sanitizedUser = donor.user
       ? {
-          ...donor.user,
           phone: showPhone ? donor.user.phone : maskPhoneNumber(donor.user.phone),
           email: donor.user.email,
         }
       : undefined;
 
     return {
-      ...donor,
+      fullName: donor.fullName,
+      bloodGroup: donor.bloodGroup,
+      city: donor.city,
+      state: donor.state,
       user: sanitizedUser,
       address: donor.hideExactAddress
         ? `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '')
         : donor.address,
       latitude: donor.hideExactAddress ? undefined : donor.latitude,
       longitude: donor.hideExactAddress ? undefined : donor.longitude,
+      isAvailable: donor.isAvailable,
+      emergencyAvailable: donor.emergencyAvailable,
     };
   }
 
-  // Anonymous / pre-acceptance view
+  // Anonymous / pre-acceptance view: Zero PII, zero internal IDs, zero exact coordinates
   const sanitizedUser = donor.user
     ? {
-        ...donor.user,
         phone: maskPhoneNumber(donor.user.phone),
         email: maskEmail(donor.user.email),
       }
     : undefined;
 
   return {
-    ...donor,
     fullName: 'Matched Donor',
-    user: sanitizedUser,
-    address: `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || 'Vicinity only',
+    bloodGroup: donor.bloodGroup,
+    city: donor.city,
+    state: donor.state,
+    address: `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '') || 'Regional area',
     latitude: undefined,
     longitude: undefined,
+    isAvailable: donor.isAvailable,
+    emergencyAvailable: donor.emergencyAvailable,
+    user: sanitizedUser,
   };
 }

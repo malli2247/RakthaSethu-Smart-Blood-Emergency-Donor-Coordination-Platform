@@ -152,7 +152,7 @@ export const RegisterPage: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-12">
-      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm space-y-8">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-10 border border-slate-200 shadow-sm space-y-8">
         {/* Header */}
         <div className="text-center space-y-2">
           <Link to="/" className="inline-flex items-center gap-2">

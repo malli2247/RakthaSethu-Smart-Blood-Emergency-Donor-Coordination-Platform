@@ -54,7 +54,7 @@ export const CommandCenterPage: React.FC = () => {
 
   // Connect to SSE stream for live updates
   useEffect(() => {
-    const eventSource = new EventSource('http://localhost:5000/api/emergency/events');
+    const eventSource = new EventSource('/api/emergency/events');
 
     eventSource.onopen = () => {
       setIsLiveConnected(true);
@@ -164,7 +164,7 @@ export const CommandCenterPage: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner & Control Bar */}
-      <div className="bg-slate-900 rounded-3xl p-6 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-xl border border-slate-800">
+      <div className="bg-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 text-white flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shadow-xl border border-slate-800">
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-950/80 text-rose-400 text-xs font-black uppercase tracking-wider border border-rose-800/40">
@@ -191,10 +191,10 @@ export const CommandCenterPage: React.FC = () => {
         </div>
 
         {/* Action buttons */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
           <button
             onClick={fetchData}
-            className="inline-flex items-center gap-2 px-3 py-2 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700"
+            className="inline-flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition border border-slate-700 touch-target"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Updated {lastRefreshed.toLocaleTimeString()}</span>
@@ -202,7 +202,7 @@ export const CommandCenterPage: React.FC = () => {
 
           <Link
             to="/admin/simulator"
-            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-lg shadow-rose-950 transition"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-black bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-lg shadow-rose-950 transition touch-target"
           >
             <PlayCircle className="w-4 h-4" />
             <span>Run Emergency Simulator</span>

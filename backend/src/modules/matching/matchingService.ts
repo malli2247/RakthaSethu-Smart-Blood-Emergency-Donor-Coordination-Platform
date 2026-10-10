@@ -2,6 +2,7 @@ import { prisma } from '../../config/database';
 import { canDonateTo, getCompatibleDonorGroups, BloodGroupType, BLOOD_GROUP_LABELS } from '../../utils/compatibility';
 import { calculateDistanceKm } from '../../utils/distance';
 import { getCityCentroid } from '../../utils/indianCityCentroids';
+import { isRareBloodGroup, getCoarseDistanceBand } from '../../utils/rareBloodClassification';
 
 export interface DonorMatchCandidate {
   donorId: string;
@@ -12,6 +13,8 @@ export interface DonorMatchCandidate {
   city: string;
   state: string;
   distanceKm: number | null;
+  distanceBand: string;
+  isRare: boolean;
   score: number;
   isEligible: boolean;
   isAvailable: boolean;
@@ -67,7 +70,7 @@ export class MatchingService {
       }
     }
 
-    // Query active donors with compatible blood group
+    // Query active donors with compatible blood group who have NOT withdrawn consent
     const donors = await prisma.donorProfile.findMany({
       where: {
         bloodGroup: {
@@ -78,6 +81,8 @@ export class MatchingService {
         },
         ...(requireAvailable ? { isAvailable: true } : {}),
         isEligible: true,
+        rareBloodMatchingConsent: true,
+        consentWithdrawnAt: null,
       },
       include: {
         user: {
@@ -100,7 +105,18 @@ export class MatchingService {
         continue;
       }
 
-      // 2. Check donation interval (90 days)
+      // 2. Enforce donor's granular urgency consent preferences
+      if (urgency === 'CRITICAL' && !donor.criticalAlertsEnabled) {
+        continue;
+      }
+      if (urgency === 'HIGH' && !donor.urgentAlertsEnabled) {
+        continue;
+      }
+      if (urgency === 'NORMAL' && !donor.generalAlertsEnabled) {
+        continue;
+      }
+
+      // 3. Check donation interval (90 days)
       if (donor.lastDonationDate) {
         const diffDays =
           (Date.now() - new Date(donor.lastDonationDate).getTime()) / (1000 * 60 * 60 * 24);
@@ -192,6 +208,9 @@ export class MatchingService {
           ? `${rawPhone.slice(0, 4)}****${rawPhone.slice(-3)}`
           : 'Contact via platform';
 
+      const isRare = isRareBloodGroup(donor.bloodGroup);
+      const distanceBand = getCoarseDistanceBand(distanceKm, isRare);
+
       candidates.push({
         donorId: donor.id,
         userId: donor.userId,
@@ -201,6 +220,8 @@ export class MatchingService {
         city: donor.city,
         state: donor.state,
         distanceKm,
+        distanceBand,
+        isRare,
         score: Math.min(100, score),
         isEligible: donor.isEligible,
         isAvailable: donor.isAvailable,

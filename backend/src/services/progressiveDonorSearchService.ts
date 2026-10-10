@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import { ResponsePredictionService } from '../modules/ml/responsePredictionService';
 import { RealtimeEventService } from './realtimeEventService';
 import { NotificationService } from './notificationService';
+import { isRareBloodGroup, getCoarseDistanceBand } from '../utils/rareBloodClassification';
 
 export interface ProgressiveSearchStep {
   radiusKm: number;
@@ -895,7 +896,16 @@ export class ProgressiveDonorSearchService {
         sequence: job.sequence,
         targetDonorsNeeded: job.targetDonorsNeeded,
         cumulativeDonors: job.cumulativeCandidates.length,
-        candidates: job.cumulativeCandidates,
+        candidates: job.cumulativeCandidates.map((c, idx) => ({
+          matchReference: `VOLUNTEER-${idx + 1}`,
+          compatibilityStatus: 'COMPATIBLE',
+          availabilityStatus: c.isAvailable ? 'AVAILABLE' : 'STANDBY',
+          verificationStatus: 'VERIFIED',
+          distanceBand: getCoarseDistanceBand(c.distanceKm, isRareBloodGroup(job.request.bloodGroup)),
+          regionLabel: c.city ? `${c.city} District` : 'Regional Area',
+          bloodGroup: c.bloodGroup,
+          bloodGroupLabel: c.bloodGroupLabel,
+        })),
         searchSteps: job.searchSteps,
         metrics: Array.from(job.metricsByRadius.values()),
         escalationPlan: job.escalationPlan,
@@ -950,32 +960,15 @@ export class ProgressiveDonorSearchService {
       },
     });
 
-    const candidates: ScoredDonorCandidate[] = matches.map((m) => ({
-      donorId: m.donorId,
-      userId: m.donor.userId,
-      fullName: m.donor.fullName,
-      bloodGroup: m.donor.bloodGroup as BloodGroupType,
-      bloodGroupLabel: BLOOD_GROUP_LABELS[m.donor.bloodGroup as BloodGroupType] || m.donor.bloodGroup,
-      city: m.donor.city,
-      state: m.donor.state,
-      distanceKm: m.distanceKm,
-      score: m.compatibilityScore,
-      scoreBreakdown: {
-        compatibility: 40,
-        exactMatchBonus: m.donor.bloodGroup === dbSearch.request.bloodGroup ? 10 : 0,
-        availability: m.donor.isAvailable ? 20 : 5,
-        emergencyReadiness: m.donor.emergencyAvailable ? 15 : 0,
-        proximity: 10,
-        experience: Math.min(5, m.donor.totalDonations),
-        predictedResponseBonus: 8,
-      },
-      predictedResponseProbability: 0.8,
-      maskedPhone: maskPhoneNumber(m.donor.user?.phone),
-      totalDonations: m.donor.totalDonations,
-      isAvailable: m.donor.isAvailable,
-      emergencyAvailable: m.donor.emergencyAvailable,
-      isPhoneVerified: Boolean(m.donor.isPhoneVerified || m.donor.user?.isPhoneVerified),
-      discoveredAtRadiusKm: m.distanceKm ? Math.ceil(m.distanceKm) : dbSearch.currentRadiusKm,
+    const candidates: any[] = matches.map((m, idx) => ({
+      matchReference: `VOLUNTEER-${idx + 1}`,
+      compatibilityStatus: 'COMPATIBLE',
+      availabilityStatus: m.status === 'ACCEPTED' ? 'ACCEPTED' : 'STANDBY',
+      verificationStatus: 'VERIFIED',
+      distanceBand: getCoarseDistanceBand(m.distanceKm, isRareBloodGroup(dbSearch.request.bloodGroup)),
+      regionLabel: m.donor.city ? `${m.donor.city} District` : 'Regional Area',
+      bloodGroup: m.donor.bloodGroup,
+      bloodGroupLabel: m.donor.bloodGroup.replace('_POSITIVE', '+').replace('_NEGATIVE', '-'),
     }));
 
     return {

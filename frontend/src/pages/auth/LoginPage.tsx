@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { Droplets, Lock, Mail, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectPath = searchParams.get('redirect');
@@ -51,14 +53,14 @@ export const LoginPage: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password');
+      setError(err.response?.data?.message || t('somethingWentWrong'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex flex-col justify-center items-center px-4 py-12">
+    <div className="min-h-[75vh] flex flex-col justify-center items-center px-4 py-8 sm:py-12">
       <div className="max-w-md w-full space-y-6">
         {/* Brand */}
         <div className="text-center space-y-2">
@@ -70,41 +72,41 @@ export const LoginPage: React.FC = () => {
               Raktha<span className="text-rose-600">Sethu</span>
             </span>
           </Link>
-          <h2 className="text-xl font-bold text-slate-800">Sign in to your account</h2>
+          <h2 className="text-xl font-bold text-slate-800">{t('signIn')}</h2>
           <p className="text-xs text-slate-500">
-            Access your donor dashboard, hospital requests, or inventory manager.
+            {t('appTagline')}
           </p>
         </div>
 
         {/* Form Card */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-5">
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              {error}
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-                Email Address
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                Email / Mobile
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="email"
                   required
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full pl-10 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 focus:bg-white"
                 />
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                   Password
                 </label>
@@ -116,14 +118,14 @@ export const LoginPage: React.FC = () => {
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="password"
                   required
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                  className="w-full pl-10 pr-3 py-2.5 text-xs sm:text-sm rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 focus:bg-white"
                 />
               </div>
             </div>
@@ -131,9 +133,9 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm shadow-md shadow-rose-200 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-rose-200 transition-colors flex items-center justify-center gap-2 cursor-pointer touch-target"
             >
-              <span>{loading ? 'Signing in...' : 'Sign In'}</span>
+              <span>{loading ? t('loading') : t('signIn')}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -142,7 +144,7 @@ export const LoginPage: React.FC = () => {
         <p className="text-center text-xs text-slate-500">
           Don't have an account yet?{' '}
           <Link to="/register" className="font-bold text-rose-600 hover:underline">
-            Register for free
+            {t('register')}
           </Link>
         </p>
       </div>

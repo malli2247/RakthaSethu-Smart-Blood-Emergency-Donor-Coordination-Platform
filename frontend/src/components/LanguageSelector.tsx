@@ -4,7 +4,7 @@ import { Globe, Check, ChevronDown } from 'lucide-react';
 import { SupportedLanguage } from '../i18n/translations';
 
 interface LanguageSelectorProps {
-  variant?: 'header' | 'drawer' | 'compact';
+  variant?: 'header' | 'drawer' | 'compact' | 'segmented';
   className?: string;
 }
 
@@ -12,7 +12,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   variant = 'header',
   className = '',
 }) => {
-  const { language, supportedLanguages, setLanguage } = useLanguage();
+  const { language, supportedLanguages, setLanguage, t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -34,31 +34,53 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
     setIsOpen(false);
   };
 
+  if (variant === 'segmented') {
+    return (
+      <div className={`inline-flex rounded-xl p-1 bg-slate-100 border border-slate-200 ${className}`}>
+        {supportedLanguages.map((l) => {
+          const isSelected = l.code === language;
+          return (
+            <button
+              key={l.code}
+              type="button"
+              onClick={() => handleSelect(l.code)}
+              className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                isSelected
+                  ? 'bg-white text-rose-600 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              {l.nativeName}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   if (variant === 'drawer') {
     return (
       <div className={`space-y-2 ${className}`}>
         <label className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
           <Globe className="w-3.5 h-3.5 text-rose-500" />
-          Select Language (భాష / भाषा)
+          {t('selectLanguage')} (English / हिन्दी / తెలుగు)
         </label>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-3 gap-2">
           {supportedLanguages.map((l) => {
             const isSelected = l.code === language;
             return (
               <button
                 key={l.code}
+                type="button"
                 onClick={() => handleSelect(l.code)}
-                className={`flex items-center justify-between px-3 py-2 text-xs rounded-xl border transition-colors ${
+                className={`flex flex-col items-center justify-center p-2.5 text-xs rounded-xl border transition-colors ${
                   isSelected
                     ? 'bg-rose-600 text-white font-bold border-rose-600 shadow-sm'
                     : 'bg-white/5 border-slate-700/60 text-slate-300 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <div className="text-left">
-                  <div className="font-semibold">{l.nativeName}</div>
-                  <div className="text-[10px] opacity-75">{l.name}</div>
-                </div>
-                {isSelected && <Check className="w-3.5 h-3.5 ml-1" />}
+                <span className="font-semibold">{l.nativeName}</span>
+                <span className="text-[10px] opacity-75">{l.name}</span>
               </button>
             );
           })}
@@ -72,8 +94,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        aria-label="Select Language"
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20"
+        aria-label={t('selectLanguage')}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all focus:outline-none focus:ring-2 focus:ring-rose-500/20 cursor-pointer"
       >
         <Globe className="w-3.5 h-3.5 text-rose-600" />
         <span className="font-bold">{currentMeta.nativeName}</span>
@@ -81,18 +103,19 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-2xl bg-white shadow-xl border border-slate-200 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="px-3 py-1.5 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            11 Indian Languages Supported
+        <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-white shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="px-3 py-1 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            {t('language')}
           </div>
-          <div className="max-h-72 overflow-y-auto py-1">
+          <div className="py-1">
             {supportedLanguages.map((l) => {
               const isSelected = l.code === language;
               return (
                 <button
                   key={l.code}
+                  type="button"
                   onClick={() => handleSelect(l.code)}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 text-xs text-left transition-colors ${
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-left transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-rose-50 text-rose-700 font-bold'
                       : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'

@@ -448,7 +448,7 @@ export const CreateRequestPage: React.FC = () => {
       )}
 
       {/* Wizard Form Container */}
-      <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm relative overflow-hidden">
+      <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 sm:p-10 border border-slate-200 shadow-sm relative overflow-hidden">
         {/* Step 1: Blood Group */}
         {currentStep === 1 && (
           <div className="space-y-6">
@@ -902,12 +902,12 @@ export const CreateRequestPage: React.FC = () => {
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-8">
+        <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 pt-6 border-t border-slate-100 mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={prevStep}
-              className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-5 py-3 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer touch-target"
             >
               <ArrowLeft className="w-4 h-4" /> Back
             </button>
@@ -919,7 +919,7 @@ export const CreateRequestPage: React.FC = () => {
             <button
               type="button"
               onClick={nextStep}
-              className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer touch-target"
             >
               Next Step <ArrowRight className="w-4 h-4" />
             </button>
@@ -928,7 +928,7 @@ export const CreateRequestPage: React.FC = () => {
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-lg shadow-rose-900/20 transition-all cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm shadow-lg shadow-rose-900/20 transition-all cursor-pointer disabled:opacity-50 touch-target"
             >
               <span>{submitting ? 'Broadcasting Emergency...' : 'Confirm & Broadcast Request'}</span>
               <ArrowRight className="w-4 h-4" />

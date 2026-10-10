@@ -3,23 +3,23 @@ import { donorApi, requestsApi } from '../../services/api';
 import { BloodGroupBadge } from '../../components/BloodGroupBadge';
 import { UrgencyBadge } from '../../components/UrgencyBadge';
 import { StatusBadge } from '../../components/StatusBadge';
+import { BottomSheet } from '../../components/common/BottomSheet';
 import {
   AlertCircle,
   MapPin,
   Clock,
   Phone,
   CheckCircle2,
-  X,
   Activity,
   Navigation,
   HeartHandshake,
-  FileCheck,
   AlertTriangle,
-  Building2,
   ExternalLink,
 } from 'lucide-react';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export const DonorRequestsPage: React.FC = () => {
+  const { t } = useLanguage();
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('ALL');
@@ -55,7 +55,7 @@ export const DonorRequestsPage: React.FC = () => {
       await fetchMatches();
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Error responding to request');
+      setMessage(err.response?.data?.message || t('somethingWentWrong'));
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setActionLoading(null);
@@ -67,7 +67,6 @@ export const DonorRequestsPage: React.FC = () => {
     try {
       await requestsApi.startTravel(matchId);
       setMessage('Navigation started. Travel status broadcasted.');
-      // Open Google Maps directions in new tab
       const dest = encodeURIComponent(`${hospitalName}, ${hospitalCity}`);
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${dest}`, '_blank');
       await fetchMatches();
@@ -118,23 +117,25 @@ export const DonorRequestsPage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-5 max-w-5xl mx-auto">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-slate-900">Blood Requests Matching You</h1>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            {t('emergencyRequests')}
+          </h1>
           <p className="text-xs text-slate-500">
-            Emergency requests from patients and hospitals in your area where your blood can save a life.
+            Patients requiring compatible blood in your perimeter.
           </p>
         </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-xl text-xs font-bold">
+        {/* Filter Pills with Horizontal Scroll Safeguard */}
+        <div className="flex items-center gap-1.5 p-1 bg-white border border-slate-200 rounded-2xl text-xs font-bold overflow-x-auto max-w-full">
           {['ALL', 'NOTIFIED', 'ACTIVE', 'CONFIRMED', 'DECLINED'].map((st) => (
             <button
               key={st}
               onClick={() => setFilter(st)}
-              className={`px-3 py-1.5 rounded-lg transition-colors ${
-                filter === st ? 'bg-rose-600 text-white' : 'text-slate-600 hover:bg-slate-50'
+              className={`px-3 py-1.5 rounded-xl transition-colors shrink-0 touch-target flex items-center justify-center cursor-pointer ${
+                filter === st ? 'bg-rose-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               {st}
@@ -144,16 +145,16 @@ export const DonorRequestsPage: React.FC = () => {
       </div>
 
       {message && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          {message}
+        <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{message}</span>
         </div>
       )}
 
       {loading ? (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-32 bg-white rounded-2xl animate-pulse" />
+            <div key={i} className="h-32 bg-white rounded-3xl animate-pulse" />
           ))}
         </div>
       ) : filteredMatches.length > 0 ? (
@@ -173,84 +174,85 @@ export const DonorRequestsPage: React.FC = () => {
             return (
               <div
                 key={m.id}
-                className={`bg-white rounded-3xl p-6 border shadow-sm space-y-4 transition-all ${
-                  isActiveParticipation ? 'border-rose-200 ring-1 ring-rose-100' : 'border-slate-200'
+                className={`bg-white rounded-3xl p-5 sm:p-6 border shadow-2xs space-y-4 transition-all ${
+                  isActiveParticipation ? 'border-rose-300 ring-1 ring-rose-200' : 'border-slate-200'
                 }`}
               >
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
                   <div className="space-y-2 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <BloodGroupBadge bloodGroup={req.bloodGroup} />
                       <UrgencyBadge urgency={req.urgency} />
                       <StatusBadge status={m.status} />
-                      <span className="text-xs font-extrabold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
-                        Match Score: {m.compatibilityScore}%
+                      <span className="text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        Score: {m.compatibilityScore}%
                       </span>
                     </div>
 
                     <div>
-                      <h3 className="text-base font-bold text-slate-900">
-                        Patient: {req.patientName} ({req.unitsRequired} Unit{req.unitsRequired > 1 ? 's' : ''} Needed)
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                        {req.patientName || 'Emergency Patient'} • {req.unitsRequired} Unit{req.unitsRequired > 1 ? 's' : ''} Needed
                       </h3>
                       {req.medicalReason && (
                         <p className="text-xs text-slate-600 italic mt-0.5">"{req.medicalReason}"</p>
                       )}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        {req.hospitalName}, {req.hospitalAddress}, {req.hospitalCity}
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        {req.hospitalName}, {req.hospitalCity}
                       </span>
-                      <span className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        Required by: {new Date(req.requiredBy).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                      </span>
+                      {req.requiredBy && (
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          Required by: {new Date(req.requiredBy).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Actions Column */}
                   <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
                     {m.status === 'NOTIFIED' || m.status === 'PENDING' ? (
-                      <>
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
                           onClick={() => handleRespond(m.id, 'ACCEPT')}
                           disabled={actionLoading === m.id}
-                          className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition-colors"
+                          className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer touch-target flex items-center justify-center"
                         >
-                          Accept Request
+                          I Can Donate
                         </button>
                         <button
                           onClick={() => handleRespond(m.id, 'DECLINE')}
                           disabled={actionLoading === m.id}
-                          className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-xs"
+                          className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 font-semibold text-xs cursor-pointer touch-target flex items-center justify-center"
                         >
-                          Decline
+                          {t('cancel')}
                         </button>
-                      </>
+                      </div>
                     ) : null}
                   </div>
                 </div>
 
-                {/* Section 6 & 7: Comprehensive Donor Acceptance & Travel Action Panel */}
+                {/* Active Donation Commitment Panel */}
                 {isActiveParticipation && (
-                  <div className="mt-4 p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="mt-3 p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5">
                       <div>
                         <span className="text-[10px] font-black uppercase tracking-wider text-rose-600">
                           Active Donation Commitment
                         </span>
-                        <h4 className="text-sm font-bold text-slate-900">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900">
                           Destination: {req.hospitalName} ({req.hospitalCity})
                         </h4>
                       </div>
 
-                      {/* Coordination room shortcut */}
                       <a
                         href={`/coordination/${req.id}`}
-                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-slate-800"
+                        className="px-3 py-1.5 bg-slate-900 text-white rounded-xl text-xs font-bold flex items-center gap-1 hover:bg-slate-800"
                       >
-                        Emergency Coordination Room <ExternalLink className="w-3 h-3" />
+                        {t('coordinationRoom')} <ExternalLink className="w-3 h-3 ml-0.5" />
                       </a>
                     </div>
 
@@ -276,10 +278,10 @@ export const DonorRequestsPage: React.FC = () => {
                         <button
                           onClick={() => handleStartTravel(m.id, req.hospitalName, req.hospitalCity)}
                           disabled={actionLoading === m.id}
-                          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs touch-target cursor-pointer"
                         >
                           <Navigation className="w-3.5 h-3.5" />
-                          START NAVIGATION
+                          Start Navigation
                         </button>
                       )}
 
@@ -287,69 +289,40 @@ export const DonorRequestsPage: React.FC = () => {
                         <button
                           onClick={() => handleMarkArrived(m.id)}
                           disabled={actionLoading === m.id}
-                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm"
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs touch-target cursor-pointer"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          I HAVE ARRIVED
+                          I Have Arrived
                         </button>
                       )}
 
                       {isArrived && (
-                        <div className="px-3.5 py-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-2">
+                        <div className="px-3 py-2 bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center gap-1.5">
                           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                          Arrival Recorded. Hospital staff will begin donation procedure shortly.
+                          Arrival Recorded. Hospital notified.
                         </div>
                       )}
 
-                      {isDonationStarted && (
-                        <div className="px-3.5 py-2 bg-rose-100 text-rose-800 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse">
-                          <HeartHandshake className="w-4 h-4 text-rose-600" />
-                          Donation procedure in progress.
-                        </div>
+                      {req.contactPhone && (
+                        <a
+                          href={`tel:${req.contactPhone}`}
+                          className="px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 touch-target"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-slate-400" />
+                          Call ({req.contactName || 'Coordinator'})
+                        </a>
                       )}
-
-                      {isDonationCompleted && (
-                        <div className="px-3.5 py-2 bg-indigo-100 text-indigo-800 rounded-xl text-xs font-bold flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-indigo-600" />
-                          Donation procedure completed. Awaiting hospital verification.
-                        </div>
-                      )}
-
-                      <a
-                        href={`tel:${req.contactPhone}`}
-                        className="px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5"
-                      >
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        Call Contact ({req.contactName})
-                      </a>
 
                       {(isAccepted || isTravelling) && (
                         <button
                           onClick={() => setCancelModalMatchId(m.id)}
                           disabled={actionLoading === m.id}
-                          className="px-3 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold ml-auto"
+                          className="px-3 py-2 text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-xl text-xs font-bold ml-auto touch-target cursor-pointer"
                         >
-                          CAN'T DONATE
+                          Can't Donate
                         </button>
                       )}
                     </div>
-                  </div>
-                )}
-
-                {isConfirmed && (
-                  <div className="mt-2 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between text-xs text-emerald-900">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      <span>
-                        <strong>Donation Officially Confirmed!</strong> Thank you for your humanitarian gift.
-                      </span>
-                    </div>
-                    <a
-                      href="/donor/history"
-                      className="text-xs font-bold text-emerald-700 underline hover:text-emerald-800"
-                    >
-                      View Certificate & History
-                    </a>
                   </div>
                 )}
               </div>
@@ -357,60 +330,63 @@ export const DonorRequestsPage: React.FC = () => {
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
-          <Activity className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm font-bold text-slate-800">No Requests Found</p>
-          <p className="text-xs text-slate-400 mt-1">
+        <div className="bg-white rounded-3xl p-10 text-center border border-slate-200">
+          <Activity className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+          <p className="text-sm font-bold text-slate-800">{t('noDataFound')}</p>
+          <p className="text-xs text-slate-400 mt-0.5">
             There are currently no blood requests matching your filter.
           </p>
         </div>
       )}
 
-      {/* Cancellation Modal (Section 33) */}
-      {cancelModalMatchId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-rose-600">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-lg font-black text-slate-900">Cancel Donation Participation</h3>
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              If you are unable to proceed with this donation, please let us know the reason. The matching engine will immediately resume searching for replacement donors to prevent delay for the patient.
-            </p>
+      {/* Cancellation Bottom Sheet */}
+      <BottomSheet
+        isOpen={Boolean(cancelModalMatchId)}
+        onClose={() => setCancelModalMatchId(null)}
+        title={
+          <div className="flex items-center gap-2 text-rose-600">
+            <AlertTriangle className="w-5 h-5" />
+            <span>Cancel Donation Participation</span>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600 leading-relaxed">
+            If you are unable to proceed with this donation, please let us know the reason. The matching engine will immediately resume searching for replacement donors to prevent delay for the patient.
+          </p>
 
-            <div className="space-y-2">
-              <label className="text-[11px] font-bold text-slate-500 uppercase">Reason for Cancellation</label>
-              <select
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-white outline-none"
-              >
-                <option value="Unexpected personal emergency">Unexpected personal emergency</option>
-                <option value="Severe traffic delay / Unable to reach hospital">Severe traffic delay / Unable to reach hospital</option>
-                <option value="Feeling unwell / Medical disqualification">Feeling unwell / Medical disqualification</option>
-                <option value="Donated blood elsewhere recently">Donated blood elsewhere recently</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold text-slate-500 uppercase">Reason for Cancellation</label>
+            <select
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full text-xs p-3 border border-slate-200 rounded-xl bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500"
+            >
+              <option value="Unexpected personal emergency">Unexpected personal emergency</option>
+              <option value="Severe traffic delay / Unable to reach hospital">Severe traffic delay / Unable to reach hospital</option>
+              <option value="Feeling unwell / Medical disqualification">Feeling unwell / Medical disqualification</option>
+              <option value="Donated blood elsewhere recently">Donated blood elsewhere recently</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
-              <button
-                onClick={() => setCancelModalMatchId(null)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50"
-              >
-                Go Back
-              </button>
-              <button
-                onClick={handleCancelMatch}
-                disabled={actionLoading !== null}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold disabled:opacity-50"
-              >
-                Confirm Cancellation & Re-match
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              onClick={() => setCancelModalMatchId(null)}
+              className="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-50 cursor-pointer touch-target"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              onClick={handleCancelMatch}
+              disabled={actionLoading !== null}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer touch-target shadow-xs"
+            >
+              {t('confirm')}
+            </button>
           </div>
         </div>
-      )}
+      </BottomSheet>
     </div>
   );
 };

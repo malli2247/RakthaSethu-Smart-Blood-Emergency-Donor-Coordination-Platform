@@ -21,6 +21,7 @@ import {
   Lock,
   RefreshCw,
 } from 'lucide-react';
+import { ResponsiveTable, Column } from '../../components/common/ResponsiveTable';
 
 export const AdminUsersPage: React.FC = () => {
   const [users, setUsers] = useState<any[]>([]);
@@ -128,6 +129,118 @@ export const AdminUsersPage: React.FC = () => {
     }
   };
 
+  const columns: Column<any>[] = [
+    {
+      header: 'User & Contact',
+      accessor: (u) => {
+        const displayName =
+          u.donorProfile?.fullName ||
+          u.patientProfile?.fullName ||
+          u.hospitalProfile?.name ||
+          u.bloodBankProfile?.name ||
+          u.volunteerProfile?.fullName ||
+          u.email.split('@')[0];
+        return (
+          <div>
+            <div className="font-bold text-slate-900">{displayName}</div>
+            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+              <span>{u.email}</span>
+              {u.phone && <span className="font-mono text-slate-500">({u.phone})</span>}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Role',
+      accessor: (u) => (
+        <span className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black border ${getRoleBadge(u.role)}`}>
+          {u.role}
+        </span>
+      ),
+    },
+    {
+      header: 'Location / Facility',
+      accessor: (u) => {
+        const location =
+          u.donorProfile?.city ||
+          u.patientProfile?.city ||
+          u.hospitalProfile?.city ||
+          u.bloodBankProfile?.city ||
+          u.volunteerProfile?.serviceAreaCity ||
+          '—';
+        return (
+          <div className="flex items-center gap-1.5 text-slate-600">
+            <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>{location}</span>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Verification',
+      accessor: (u) => (
+        <button
+          onClick={() => handleToggleVerify(u.id, u.isVerified)}
+          title="Click to toggle verification"
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold transition-all ${
+            u.isVerified
+              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+          }`}
+        >
+          {u.isVerified ? (
+            <>
+              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Verified
+            </>
+          ) : (
+            <>
+              <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> Pending
+            </>
+          )}
+        </button>
+      ),
+    },
+    {
+      header: 'Account Status',
+      accessor: (u) => (
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+            u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+          }`}
+        >
+          <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+          {u.isActive ? 'Active' : 'Suspended'}
+        </span>
+      ),
+    },
+    {
+      header: 'Actions',
+      className: 'text-right',
+      accessor: (u) => (
+        <div className="inline-flex items-center gap-2">
+          <button
+            onClick={() => openUserDetails(u)}
+            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+            title="Inspect Profile"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleToggleActive(u.id, u.isActive)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+              u.isActive
+                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+            }`}
+          >
+            {u.isActive ? 'Suspend' : 'Reactivate'}
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header & Overview */}
@@ -210,149 +323,114 @@ export const AdminUsersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs sm:text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                <th className="p-4">User & Contact</th>
-                <th className="p-4">Role</th>
-                <th className="p-4">Location / Facility</th>
-                <th className="p-4">Verification</th>
-                <th className="p-4">Account Status</th>
-                <th className="p-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin text-rose-500" />
-                      <span>Loading user directory...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500">
-                    No users found matching current filters.
-                  </td>
-                </tr>
-              ) : (
-                users.map((u) => {
-                  const displayName =
-                    u.donorProfile?.fullName ||
-                    u.patientProfile?.fullName ||
-                    u.hospitalProfile?.name ||
-                    u.bloodBankProfile?.name ||
-                    u.volunteerProfile?.fullName ||
-                    u.email.split('@')[0];
+      {/* Users Responsive Table / Cards */}
+      <ResponsiveTable
+        columns={columns}
+        data={users}
+        isLoading={loading}
+        keyExtractor={(u: any) => u.id}
+        emptyState={
+          <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+            <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm font-bold text-slate-800">No users found</p>
+            <p className="text-xs text-slate-400 mt-1">
+              No registered user records match the active role or status filters.
+            </p>
+          </div>
+        }
+        renderMobileCard={(u: any) => {
+          const displayName =
+            u.donorProfile?.fullName ||
+            u.patientProfile?.fullName ||
+            u.hospitalProfile?.name ||
+            u.bloodBankProfile?.name ||
+            u.volunteerProfile?.fullName ||
+            u.email.split('@')[0];
 
-                  const location =
-                    u.donorProfile?.city ||
-                    u.patientProfile?.city ||
-                    u.hospitalProfile?.city ||
-                    u.bloodBankProfile?.city ||
-                    u.volunteerProfile?.serviceAreaCity ||
-                    '—';
+          const location =
+            u.donorProfile?.city ||
+            u.patientProfile?.city ||
+            u.hospitalProfile?.city ||
+            u.bloodBankProfile?.city ||
+            u.volunteerProfile?.serviceAreaCity ||
+            '—';
 
-                  return (
-                    <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-slate-900">{displayName}</div>
-                        <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                          <span>{u.email}</span>
-                          {u.phone && <span className="font-mono text-slate-500">({u.phone})</span>}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-block px-2.5 py-0.5 rounded-md text-[11px] font-black border ${getRoleBadge(
-                            u.role
-                          )}`}
-                        >
-                          {u.role}
-                        </span>
-                      </td>
-                      <td className="p-4 text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>{location}</span>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <button
-                          onClick={() => handleToggleVerify(u.id, u.isVerified)}
-                          title="Click to toggle verification"
-                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold transition-all ${
-                            u.isVerified
-                              ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                              : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
-                          }`}
-                        >
-                          {u.isVerified ? (
-                            <>
-                              <ShieldCheck className="w-3.5 h-3.5 text-blue-600" /> Verified
-                            </>
-                          ) : (
-                            <>
-                              <ShieldAlert className="w-3.5 h-3.5 text-amber-600" /> Pending
-                            </>
-                          )}
-                        </button>
-                      </td>
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                            u.isActive
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-rose-50 text-rose-700'
-                          }`}
-                        >
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              u.isActive ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
-                            }`}
-                          />
-                          {u.isActive ? 'Active' : 'Suspended'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="inline-flex items-center gap-2">
-                          <button
-                            onClick={() => openUserDetails(u)}
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                            title="Inspect Profile"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleToggleActive(u.id, u.isActive)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
-                              u.isActive
-                                ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-                                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
-                            }`}
-                          >
-                            {u.isActive ? 'Suspend' : 'Reactivate'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+          return (
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-2xs space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="font-bold text-slate-900 text-sm">{displayName}</div>
+                  <div className="text-xs text-slate-500 break-all">{u.email}</div>
+                  {u.phone && <div className="text-xs text-slate-400 font-mono mt-0.5">{u.phone}</div>}
+                </div>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-black border shrink-0 ${getRoleBadge(u.role)}`}>
+                  {u.role}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-1 text-slate-600">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{location}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleToggleVerify(u.id, u.isVerified)}
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                      u.isVerified ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {u.isVerified ? (
+                      <>
+                        <ShieldCheck className="w-3 h-3 text-blue-600" /> Verified
+                      </>
+                    ) : (
+                      <>
+                        <ShieldAlert className="w-3 h-3 text-amber-600" /> Pending
+                      </>
+                    )}
+                  </button>
+
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${
+                      u.isActive ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    {u.isActive ? 'Active' : 'Suspended'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                <button
+                  onClick={() => openUserDetails(u)}
+                  className="px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  Inspect
+                </button>
+                <button
+                  onClick={() => handleToggleActive(u.id, u.isActive)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
+                    u.isActive
+                      ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                      : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  {u.isActive ? 'Suspend' : 'Reactivate'}
+                </button>
+              </div>
+            </div>
+          );
+        }}
+      />
 
       {/* User Details & Profile Inspector Modal */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl p-6 space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-slate-200 shadow-2xl p-4 sm:p-6 space-y-6">
             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">

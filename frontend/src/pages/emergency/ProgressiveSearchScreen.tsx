@@ -422,7 +422,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
     (executionState === 'SEARCH_COMPLETED' && candidates.length < targetDonors);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-6 px-3 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-6">
         {/* Breadcrumb / Top Bar */}
         <div className="flex items-center justify-between text-xs text-slate-400">
@@ -441,7 +441,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
         </div>
 
         {/* SECTION 6: PREMIUM SEARCH HEADER */}
-        <div className="bg-gradient-to-r from-rose-950/90 via-slate-900 to-slate-900 border border-rose-600/30 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
+        <div className="bg-gradient-to-r from-rose-950/90 via-slate-900 to-slate-900 border border-rose-600/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-md">
           <div className="absolute -top-16 -right-16 w-60 h-60 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-rose-600/20">
@@ -459,7 +459,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
             </div>
 
             {/* Target and Blood Group Box */}
-            <div className="flex items-center gap-4 bg-slate-900/80 border border-slate-700/80 rounded-2xl p-4 self-start md:self-auto">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4 bg-slate-900/80 border border-slate-700/80 rounded-2xl p-3 sm:p-4 self-start md:self-auto">
               <div className="text-center px-2 border-r border-slate-700">
                 <span className="text-[10px] uppercase font-bold text-slate-400 block">Required</span>
                 <span className="text-xl sm:text-2xl font-black text-rose-400">
@@ -572,7 +572,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
             }`}
           >
             {/* Active Radar Scanner Card */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl relative overflow-hidden backdrop-blur-sm">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl relative overflow-hidden backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Activity className="w-5 h-5 text-rose-500 animate-pulse" />
@@ -724,7 +724,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
             </div>
 
             {/* SECTION 10: MAP VISUALIZATION TOGGLE */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Compass className="w-5 h-5 text-rose-400" />
@@ -766,7 +766,7 @@ export const ProgressiveSearchScreen: React.FC = () => {
             }`}
           >
             {/* SECTION 7: PROGRESSIVE TIMELINE */}
-            <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-sm">
+            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl backdrop-blur-sm">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-rose-400" />

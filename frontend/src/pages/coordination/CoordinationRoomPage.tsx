@@ -139,7 +139,7 @@ export const CoordinationRoomPage: React.FC = () => {
   const { bloodRequest, room, acceptedDonors, navigation } = data;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-6 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 py-6 px-3 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto space-y-6">
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
@@ -158,7 +158,7 @@ export const CoordinationRoomPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-6 text-xs">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs">
             <div>
               <span className="text-slate-400 block">Units Required</span>
               <span className="text-base font-bold text-white">{bloodRequest.unitsRequired} Unit(s)</span>
@@ -254,7 +254,7 @@ export const CoordinationRoomPage: React.FC = () => {
           </div>
 
           {/* Right Column (7 cols): Controlled Coordination Chat */}
-          <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col h-[580px] overflow-hidden">
+          <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col h-[480px] sm:h-[580px] overflow-hidden">
             {/* Chat Top Banner */}
             <div className="p-3.5 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-200 flex items-center gap-2">
@@ -339,7 +339,7 @@ export const CoordinationRoomPage: React.FC = () => {
               <button
                 onClick={() => handleSendMessage()}
                 disabled={sending || !inputText.trim()}
-                className="p-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl disabled:opacity-40 transition shadow-sm"
+                className="p-3 min-w-[44px] min-h-[44px] flex items-center justify-center bg-rose-600 hover:bg-rose-500 text-white rounded-xl disabled:opacity-40 transition shadow-sm touch-target"
               >
                 <Send className="w-4 h-4" />
               </button>

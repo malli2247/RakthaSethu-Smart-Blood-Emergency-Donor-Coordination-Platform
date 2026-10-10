@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Heart,
@@ -32,7 +32,7 @@ export const HowItWorksPage: React.FC = () => {
       {/* Role specific workflow cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* For Patients / Families */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200">
             <AlertCircle className="w-6 h-6" />
           </div>
@@ -69,7 +69,7 @@ export const HowItWorksPage: React.FC = () => {
         </div>
 
         {/* For Blood Donors */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
             <Heart className="w-6 h-6 fill-emerald-600" />
           </div>
@@ -106,7 +106,7 @@ export const HowItWorksPage: React.FC = () => {
         </div>
 
         {/* For Hospitals & Blood Banks */}
-        <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-slate-200 shadow-sm space-y-6">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-200">
             <Building2 className="w-6 h-6" />
           </div>

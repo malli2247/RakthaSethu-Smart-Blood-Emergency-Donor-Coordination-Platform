@@ -95,6 +95,21 @@ model DonorProfile {
   phoneVerifiedAt      DateTime?
   hidePhoneNumber      Boolean       @default(false)
   hideExactAddress     Boolean       @default(true)
+
+  // Rare Blood Group & Privacy-Preserving Donor Consent
+  rareBloodMatchingConsent    Boolean   @default(true)
+  rareEmergencyAlertsEnabled  Boolean   @default(true)
+  criticalAlertsEnabled       Boolean   @default(true)
+  urgentAlertsEnabled         Boolean   @default(true)
+  generalAlertsEnabled        Boolean   @default(true)
+  locationPrivacyLevel        String    @default("MAXIMUM_PRIVACY") // "APPROXIMATE_REGION" | "REVEAL_AFTER_ACCEPT" | "MAXIMUM_PRIVACY"
+  contactPrivacyLevel         String    @default("HIDDEN_UNTIL_ACCEPTANCE") // "HIDDEN_UNTIL_ACCEPTANCE" | "CONTROLLED_COORDINATION"
+  notificationFrequencyLimit  Int       @default(5)
+  consentVersion              String    @default("v2.0-privacy")
+  consentTimestamp            DateTime  @default(now())
+  consentWithdrawnAt          DateTime?
+  coarseRegion                String?
+
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
@@ -109,6 +124,7 @@ model DonorProfile {
   @@index([isAvailable, isEligible, bloodGroup])
   @@index([isAvailable, emergencyAvailable])
   @@index([availabilityStatus])
+  @@index([rareBloodMatchingConsent, consentWithdrawnAt])
 }
 
 model PatientProfile {
@@ -563,6 +579,10 @@ model EmergencySearch {
   targetDonorsNeeded   Int                   @default(5)
   donorsFoundCount     Int                   @default(0)
   donorsContactedCount Int                   @default(0)
+  requestingUserId     String?
+  searchPolicy         String                @default("STRICT_PRIVACY") // "STRICT_PRIVACY" | "EMERGENCY_ESCALATED"
+  isRareSearch         Boolean               @default(false)
+  sessionToken         String?
   startedAt            DateTime              @default(now())
   completedAt          DateTime?
   escalationPlan       String?               // JSON string of AI escalation recommendations
