@@ -3,6 +3,7 @@ import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { calculateDistanceKm } from '../../utils/distance';
 import { CacheService } from '../../services/cacheService';
+import { DonorConsentService } from '../../services/donorConsentService';
 
 export async function getDonorProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -127,6 +128,32 @@ export async function updateDonorProfile(req: Request, res: Response, next: Next
         ...(emergencyAvailable !== undefined && { emergencyAvailable: Boolean(emergencyAvailable) }),
         ...(hidePhoneNumber !== undefined && { hidePhoneNumber: Boolean(hidePhoneNumber) }),
         ...(hideExactAddress !== undefined && { hideExactAddress: Boolean(hideExactAddress) }),
+        ...(req.body.rareBloodMatchingConsent !== undefined && {
+          rareBloodMatchingConsent: Boolean(req.body.rareBloodMatchingConsent),
+          ...(req.body.rareBloodMatchingConsent && { consentWithdrawnAt: null }),
+        }),
+        ...(req.body.rareEmergencyAlertsEnabled !== undefined && {
+          rareEmergencyAlertsEnabled: Boolean(req.body.rareEmergencyAlertsEnabled),
+        }),
+        ...(req.body.criticalAlertsEnabled !== undefined && {
+          criticalAlertsEnabled: Boolean(req.body.criticalAlertsEnabled),
+        }),
+        ...(req.body.urgentAlertsEnabled !== undefined && {
+          urgentAlertsEnabled: Boolean(req.body.urgentAlertsEnabled),
+        }),
+        ...(req.body.generalAlertsEnabled !== undefined && {
+          generalAlertsEnabled: Boolean(req.body.generalAlertsEnabled),
+        }),
+        ...(req.body.locationPrivacyLevel && {
+          locationPrivacyLevel: req.body.locationPrivacyLevel,
+        }),
+        ...(req.body.contactPrivacyLevel && {
+          contactPrivacyLevel: req.body.contactPrivacyLevel,
+        }),
+        ...(req.body.notificationFrequencyLimit !== undefined && {
+          notificationFrequencyLimit: Math.max(1, Math.min(20, Number(req.body.notificationFrequencyLimit))),
+        }),
+        consentTimestamp: new Date(),
         ...(lastDonationDate !== undefined && {
           lastDonationDate: lastDonationDate ? new Date(lastDonationDate) : null,
         }),
@@ -295,6 +322,40 @@ export async function recordPastDonation(req: Request, res: Response, next: Next
 
     CacheService.invalidateByTag('stats');
     sendSuccess(res, donation, 'Donation recorded successfully', 201);
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Updates donor privacy preferences and consent settings.
+ * PATCH /api/donors/consent
+ */
+export async function updateDonorConsent(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
+    const updated = await DonorConsentService.updateConsent(userId, req.body, ip);
+    CacheService.invalidateByTag('stats');
+    sendSuccess(res, updated, 'Donor privacy consent preferences updated successfully');
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Withdraws donor consent for matching and emergency notifications.
+ * Section 22: Immediately removes donor from future matching queues.
+ * POST /api/donors/consent/withdraw
+ */
+export async function withdrawDonorConsent(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const userId = req.user!.id;
+    const { reason } = req.body || {};
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
+    const updated = await DonorConsentService.withdrawConsent(userId, reason, ip);
+    CacheService.invalidateByTag('stats');
+    sendSuccess(res, updated, 'Donor matching consent has been withdrawn. You have been removed from future emergency matching.');
   } catch (error) {
     next(error);
   }

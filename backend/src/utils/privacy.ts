@@ -2,6 +2,7 @@
  * Privacy utilities for protecting donor and patient personal identifiable information (PII).
  * Ensures compliance with health data privacy and platform donor security requirements.
  */
+import { isRareBloodGroup } from './rareBloodClassification';
 
 /**
  * Masks a telephone number: e.g., '+919876543210' -> '+91 98****3210', '9876543210' -> '98****3210'
@@ -83,11 +84,11 @@ export function sanitizeDonorView(
       city: donor.city,
       state: donor.state,
       user: sanitizedUser,
-      address: donor.hideExactAddress
+      address: (donor.hideExactAddress || isRareBloodGroup(donor.bloodGroup))
         ? `${donor.city || ''}, ${donor.state || ''}`.trim().replace(/^,\s*|,\s*$/g, '')
         : donor.address,
-      latitude: donor.hideExactAddress ? undefined : donor.latitude,
-      longitude: donor.hideExactAddress ? undefined : donor.longitude,
+      latitude: (donor.hideExactAddress || isRareBloodGroup(donor.bloodGroup)) ? undefined : donor.latitude,
+      longitude: (donor.hideExactAddress || isRareBloodGroup(donor.bloodGroup)) ? undefined : donor.longitude,
       isAvailable: donor.isAvailable,
       emergencyAvailable: donor.emergencyAvailable,
     };

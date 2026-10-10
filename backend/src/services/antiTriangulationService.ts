@@ -144,7 +144,7 @@ export class AntiTriangulationService {
         }
       }
 
-      if (fineGrainRadiusChanges >= 3) {
+      if (fineGrainRadiusChanges >= 2) {
         await this.recordSecurityEvent({
           userId: params.userId,
           ip: params.ip,

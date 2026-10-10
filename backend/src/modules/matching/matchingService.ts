@@ -282,12 +282,20 @@ export class MatchingService {
         },
       });
 
-      // Create in-app notification for the donor
+      // Create in-app notification for the donor (Section 16: Zero patient PII or lock-screen leakage)
+      const isRare = isRareBloodGroup(request.bloodGroup);
+      const notifTitle = isRare
+        ? 'Urgent Blood Match Alert'
+        : `Emergency Blood Request: ${request.bloodGroup.replace('_', '+')}`;
+      const notifMessage = isRare
+        ? 'An urgent blood request may match your donation preferences. Open RakthaSethu to review.'
+        : `A verified emergency request for ${request.bloodGroup.replace('_', '+')} is active in your area. Open RakthaSethu to review.`;
+
       await prisma.notification.create({
         data: {
           userId: candidate.userId,
-          title: `Emergency Blood Request: ${request.bloodGroup.replace('_', '+')}`,
-          message: `URGENT: ${request.patientName} at ${request.hospitalName} requires ${request.unitsRequired} unit(s) of ${request.bloodGroup}. Urgency: ${request.urgency}.`,
+          title: notifTitle,
+          message: notifMessage,
           type: request.urgency === 'CRITICAL' ? 'EMERGENCY_ALERT' : 'NEW_REQUEST',
           link: `/donor/requests`,
         },

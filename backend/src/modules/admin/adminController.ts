@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../../config/database';
 import { sendSuccess, AppError } from '../../utils/response';
 import { recordAuditLog } from '../../utils/auditLogger';
+import { isRareBloodGroup } from '../../utils/rareBloodClassification';
 
 import { CacheService } from '../../services/cacheService';
 import { RequestService } from '../requests/requestService';
@@ -163,6 +164,28 @@ export async function getUserById(req: Request, res: Response, next: NextFunctio
 
     if (!user) {
       throw new AppError('User not found', 404, 'NOT_FOUND');
+    }
+
+    // Section 20: Audit sensitive donor profile view by admin
+    if (user.donorProfile) {
+      const isRare = isRareBloodGroup(user.donorProfile.bloodGroup);
+      await prisma.auditLog.create({
+        data: {
+          userId: req.user!.id,
+          action: isRare ? 'VIEW_RARE_DONOR_PROFILE' : 'VIEW_DONOR_PROFILE',
+          entity: 'DonorProfile',
+          entityId: user.donorProfile.id,
+          details: `Admin ${req.user!.id} viewed donor profile for user ${id}`,
+          ipAddress: req.ip,
+        },
+      });
+
+      // Section 6: Never expose exact donor GPS coordinates
+      user.donorProfile.latitude = null as any;
+      user.donorProfile.longitude = null as any;
+      if (user.donorProfile.hideExactAddress || isRare) {
+        user.donorProfile.address = `${user.donorProfile.city}, ${user.donorProfile.state}`;
+      }
     }
 
     const { passwordHash, ...safeUser } = user;

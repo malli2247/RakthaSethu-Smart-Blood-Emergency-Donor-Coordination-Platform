@@ -52,9 +52,16 @@ export const DonorProfilePage: React.FC = () => {
   const [hidePhoneNumber, setHidePhoneNumber] = useState(false);
   const [hideExactAddress, setHideExactAddress] = useState(true);
 
-  // Rare blood matching consent
+  // Granular emergency preferences and privacy consent (Section 5)
   const [rareBloodConsent, setRareBloodConsent] = useState(true);
+  const [rareEmergencyAlertsEnabled, setRareEmergencyAlertsEnabled] = useState(true);
   const [criticalAlertsEnabled, setCriticalAlertsEnabled] = useState(true);
+  const [urgentAlertsEnabled, setUrgentAlertsEnabled] = useState(true);
+  const [generalAlertsEnabled, setGeneralAlertsEnabled] = useState(true);
+  const [locationPrivacyLevel, setLocationPrivacyLevel] = useState<'APPROXIMATE_REGION' | 'REVEAL_AFTER_ACCEPT' | 'MAXIMUM_PRIVACY'>('MAXIMUM_PRIVACY');
+  const [contactPrivacyLevel, setContactPrivacyLevel] = useState<'HIDDEN_UNTIL_ACCEPTANCE' | 'CONTROLLED_COORDINATION'>('HIDDEN_UNTIL_ACCEPTANCE');
+  const [consentWithdrawnAt, setConsentWithdrawnAt] = useState<string | null>(null);
+  const [withdrawingConsent, setWithdrawingConsent] = useState(false);
 
   const loadProfile = () => {
     donorApi
@@ -76,7 +83,13 @@ export const DonorProfilePage: React.FC = () => {
           setHidePhoneNumber(Boolean(d.hidePhoneNumber));
           setHideExactAddress(d.hideExactAddress !== false);
           setRareBloodConsent(d.rareBloodMatchingConsent !== false);
+          setRareEmergencyAlertsEnabled(d.rareEmergencyAlertsEnabled !== false);
           setCriticalAlertsEnabled(d.criticalAlertsEnabled !== false);
+          setUrgentAlertsEnabled(d.urgentAlertsEnabled !== false);
+          setGeneralAlertsEnabled(d.generalAlertsEnabled !== false);
+          if (d.locationPrivacyLevel) setLocationPrivacyLevel(d.locationPrivacyLevel);
+          if (d.contactPrivacyLevel) setContactPrivacyLevel(d.contactPrivacyLevel);
+          setConsentWithdrawnAt(d.consentWithdrawnAt || null);
         }
       })
       .catch((err) => console.error(err))
@@ -104,9 +117,14 @@ export const DonorProfilePage: React.FC = () => {
         hidePhoneNumber,
         hideExactAddress,
         rareBloodMatchingConsent: rareBloodConsent,
+        rareEmergencyAlertsEnabled,
         criticalAlertsEnabled,
+        urgentAlertsEnabled,
+        generalAlertsEnabled,
+        locationPrivacyLevel,
+        contactPrivacyLevel,
       });
-      setMessage('Profile settings updated successfully!');
+      setMessage('Profile settings and privacy preferences updated successfully!');
       loadProfile();
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
@@ -114,6 +132,26 @@ export const DonorProfilePage: React.FC = () => {
       setTimeout(() => setMessage(null), 3000);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleWithdrawConsent = async () => {
+    if (!window.confirm('Are you sure you want to withdraw matching consent? You will be immediately removed from emergency matching queues.')) {
+      return;
+    }
+    setWithdrawingConsent(true);
+    try {
+      await donorApi.withdrawConsent({ reason: 'Donor requested matching consent withdrawal via settings' });
+      setConsentWithdrawnAt(new Date().toISOString());
+      setRareBloodConsent(false);
+      setMessage('Matching consent withdrawn. You have been removed from future matching queues.');
+      loadProfile();
+      setTimeout(() => setMessage(null), 4000);
+    } catch (err: any) {
+      setMessage(err.response?.data?.message || t('somethingWentWrong'));
+      setTimeout(() => setMessage(null), 3000);
+    } finally {
+      setWithdrawingConsent(false);
     }
   };
 
@@ -416,55 +454,180 @@ export const DonorProfilePage: React.FC = () => {
           </button>
 
           {openSections.privacy && (
-            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 mt-3 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hidePhoneNumber}
-                    onChange={(e) => setHidePhoneNumber(e.target.checked)}
-                    className="w-4 h-4 text-rose-600 rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Mask Phone Number</span>
-                    <span className="text-[11px] text-slate-500">
-                      Only reveal phone to coordinator after you accept.
-                    </span>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 p-3.5 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hideExactAddress}
-                    onChange={(e) => setHideExactAddress(e.target.checked)}
-                    className="w-4 h-4 text-rose-600 rounded"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">Coarse Perimeter Only</span>
-                    <span className="text-[11px] text-slate-500">
-                      Never reveal exact street coordinates publicly.
-                    </span>
-                  </div>
-                </label>
+            <div className="p-4 sm:p-5 pt-0 border-t border-slate-100 mt-3 space-y-4">
+              {/* Privacy Reassurance Guarantees (Section 38) */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-emerald-950 text-xs space-y-1.5">
+                <div className="font-bold flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Privacy-Preserving Donor Protections</span>
+                </div>
+                <ul className="text-[11px] text-emerald-800 space-y-1 list-disc pl-5 leading-relaxed">
+                  <li>Your exact location is never shown to blood requesters.</li>
+                  <li>Your contact information remains private until authorized coordination.</li>
+                  <li>Rare blood requests are securely matched without publicly listing donors.</li>
+                </ul>
               </div>
 
-              {/* Rare Blood Consent */}
-              <div className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200 space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rareBloodConsent}
-                    onChange={(e) => setRareBloodConsent(e.target.checked)}
-                    className="w-4 h-4 text-rose-600 rounded mt-0.5"
-                  />
-                  <div>
-                    <span className="text-xs font-bold text-rose-950 block">{t('rareBloodConsent')}</span>
-                    <span className="text-[11px] text-rose-800 leading-relaxed block mt-0.5">
-                      {t('rareConsentDesc')}
-                    </span>
-                  </div>
-                </label>
+              {/* Emergency Alert Preferences (Section 5) */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Emergency Request Preferences</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label className="flex items-start gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rareEmergencyAlertsEnabled}
+                      onChange={(e) => setRareEmergencyAlertsEnabled(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 rounded mt-0.5"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Allow Emergency Blood Requests</span>
+                      <span className="text-[11px] text-slate-500">Receive alerts for clinical blood requests in your regional vicinity.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={criticalAlertsEnabled}
+                      onChange={(e) => setCriticalAlertsEnabled(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 rounded mt-0.5"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Allow Critical Rare-Blood Requests</span>
+                      <span className="text-[11px] text-slate-500">Receive high-priority alerts for acute life-threatening situations.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={urgentAlertsEnabled}
+                      onChange={(e) => setUrgentAlertsEnabled(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 rounded mt-0.5"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Allow Urgent Requests</span>
+                      <span className="text-[11px] text-slate-500">Receive notifications for scheduled inpatient transfusions.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-2xl border border-slate-200 bg-slate-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rareBloodConsent}
+                      onChange={(e) => setRareBloodConsent(e.target.checked)}
+                      className="w-4 h-4 text-rose-600 rounded mt-0.5"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">Potential Match Notifications</span>
+                      <span className="text-[11px] text-slate-500">Notify me securely when my blood group matches a verified patient.</span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Location Privacy Radios */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Location Privacy Level</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <label className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-colors ${locationPrivacyLevel === 'MAXIMUM_PRIVACY' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="locationPrivacy"
+                        checked={locationPrivacyLevel === 'MAXIMUM_PRIVACY'}
+                        onChange={() => setLocationPrivacyLevel('MAXIMUM_PRIVACY')}
+                        className="w-3.5 h-3.5 text-rose-600"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Maximum Privacy (Default)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 pl-5.5">Fuzzy distance band only. Coordinates strictly hidden.</span>
+                  </label>
+
+                  <label className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-colors ${locationPrivacyLevel === 'APPROXIMATE_REGION' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="locationPrivacy"
+                        checked={locationPrivacyLevel === 'APPROXIMATE_REGION'}
+                        onChange={() => setLocationPrivacyLevel('APPROXIMATE_REGION')}
+                        className="w-3.5 h-3.5 text-rose-600"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Approximate Region Only</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 pl-5.5">Shows municipal district perimeter only.</span>
+                  </label>
+
+                  <label className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-colors ${locationPrivacyLevel === 'REVEAL_AFTER_ACCEPT' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="locationPrivacy"
+                        checked={locationPrivacyLevel === 'REVEAL_AFTER_ACCEPT'}
+                        onChange={() => setLocationPrivacyLevel('REVEAL_AFTER_ACCEPT')}
+                        className="w-3.5 h-3.5 text-rose-600"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Reveal After Acceptance</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 pl-5.5">Shares general area with hospital after you accept.</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Contact Privacy Radios */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">Contact Privacy</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <label className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-colors ${contactPrivacyLevel === 'HIDDEN_UNTIL_ACCEPTANCE' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="contactPrivacy"
+                        checked={contactPrivacyLevel === 'HIDDEN_UNTIL_ACCEPTANCE'}
+                        onChange={() => setContactPrivacyLevel('HIDDEN_UNTIL_ACCEPTANCE')}
+                        className="w-3.5 h-3.5 text-rose-600"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Hidden Until Acceptance (Default)</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 pl-5.5">Contact details remain fully masked until you accept.</span>
+                  </label>
+
+                  <label className={`p-3 rounded-2xl border cursor-pointer flex flex-col gap-1 transition-colors ${contactPrivacyLevel === 'CONTROLLED_COORDINATION' ? 'border-rose-500 bg-rose-50/50' : 'border-slate-200 bg-slate-50'}`}>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="contactPrivacy"
+                        checked={contactPrivacyLevel === 'CONTROLLED_COORDINATION'}
+                        onChange={() => setContactPrivacyLevel('CONTROLLED_COORDINATION')}
+                        className="w-3.5 h-3.5 text-rose-600"
+                      />
+                      <span className="text-xs font-bold text-slate-900">Controlled Coordination Relay</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 pl-5.5">Relay via verified hospital coordinator only.</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Consent Withdrawal (Section 22) */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-amber-950 block">Matching Consent Management</span>
+                  <span className="text-[11px] text-amber-800 block">
+                    {consentWithdrawnAt
+                      ? `Consent withdrawn on ${new Date(consentWithdrawnAt).toLocaleDateString()}. You are excluded from matching.`
+                      : 'You can withdraw emergency matching consent at any time.'}
+                  </span>
+                </div>
+                {!consentWithdrawnAt && (
+                  <button
+                    type="button"
+                    onClick={handleWithdrawConsent}
+                    disabled={withdrawingConsent}
+                    className="px-3.5 py-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-100/60 text-amber-900 text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  >
+                    {withdrawingConsent ? 'Withdrawing...' : 'Withdraw Consent'}
+                  </button>
+                )}
               </div>
             </div>
           )}

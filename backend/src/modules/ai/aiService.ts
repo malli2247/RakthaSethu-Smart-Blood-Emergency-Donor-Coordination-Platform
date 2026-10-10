@@ -1,4 +1,4 @@
-﻿import { config } from '../../config';
+import { config } from '../../config';
 import { BloodGroupType, canDonateTo } from '../../utils/compatibility';
 
 export interface AiClassificationResult {
@@ -98,6 +98,36 @@ export class AiService {
       '⚠️ Medical Disclaimer: RakthaSethu AI Assistant provides informational guidance only and is NOT a substitute for professional medical advice, clinical diagnosis, or emergency healthcare services. In a life-threatening emergency, call local emergency numbers (e.g. 112 / 911) or visit the nearest hospital emergency room immediately.';
 
     const q = (question || '').toLowerCase();
+
+    // Section 18: Anti-Enumeration & Donor Privacy Guardrail
+    const privacyViolationPatterns = [
+      /list\s+(all\s+)?(rare\s+)?donors/i,
+      /show\s+(me\s+)?donors/i,
+      /give\s+me\s+(the\s+)?(phone|number|contact)/i,
+      /phone\s+number\s+of/i,
+      /where\s+is\s+the\s+nearest\s+(rare\s+)?donor/i,
+      /nearest\s+(rare\s+)?donor/i,
+      /how\s+many\s+.*donors(\s+in|\s+near|\s+are|\?|$)/i,
+      /donors\s+within/i,
+      /which\s+donor\s+donated/i,
+      /who\s+donated\s+most\s+recently/i,
+      /contact\s+details\s+of\s+donor/i,
+      /donor\s+address/i,
+      /donor\s+coordinates/i,
+    ];
+
+    if (privacyViolationPatterns.some((pattern) => pattern.test(question))) {
+      return {
+        reply:
+          "I can't provide private donor identities or exact locations. RakthaSethu can securely match eligible donors through the authorized emergency process.",
+        disclaimer,
+        suggestedFollowUps: [
+          'How does privacy-preserving donor matching work?',
+          'How do I create an emergency blood request?',
+          'How does blood compatibility work in emergencies?',
+        ],
+      };
+    }
 
     if (q.includes('o-') || q.includes('o negative')) {
       return {

@@ -7,6 +7,9 @@ import { DemandForecastingService } from '../ml/demandForecastingService';
 import { FraudDetectionService } from '../ml/fraudDetectionService';
 import { logger } from '../../utils/logger';
 import crypto from 'crypto';
+import { isRareBloodGroup } from '../../utils/rareBloodClassification';
+import { MIN_PUBLIC_AGGREGATE_THRESHOLD } from '../../utils/privacyTiers';
+import { getCityCentroid } from '../../utils/indianCityCentroids';
 
 /**
  * Server-Sent Events real-time event streaming endpoint
@@ -318,53 +321,68 @@ export async function getMapLayers(req: Request, res: Response, next: NextFuncti
         },
         take: 50,
       }),
-      prisma.donorProfile.findMany({
-        where: {
-          isAvailable: true,
-          isEligible: true,
-          user: { isActive: true },
-          ...(bloodGroup ? { bloodGroup: String(bloodGroup) } : {}),
-        },
-        select: {
-          id: true,
-          bloodGroup: true,
-          city: true,
-          state: true,
-          latitude: true,
-          longitude: true,
-          emergencyAvailable: true,
-        },
-        take: 80,
-      }),
+      // Section 25: Rare donors must NEVER appear as map markers or individual zones.
+      // If a rare blood group is filtered, return zero donor zones.
+      isRareBloodGroup(String(bloodGroup))
+        ? Promise.resolve([])
+        : prisma.donorProfile.findMany({
+            where: {
+              isAvailable: true,
+              isEligible: true,
+              user: { isActive: true },
+              ...(bloodGroup ? { bloodGroup: String(bloodGroup) } : {}),
+            },
+            select: {
+              id: true,
+              bloodGroup: true,
+              city: true,
+              state: true,
+              emergencyAvailable: true,
+            },
+            take: 200,
+          }),
     ]);
 
-    // PRIVACY ENFORCEMENT: Never expose exact donor GPS coordinates or street addresses!
-    // Deterministically fuzz donor coordinates within ~1.2 km radius to protect donor homes
-    const fuzzedDonorZones = donors
-      .filter((d) => d.latitude !== null && d.longitude !== null)
-      .map((d) => {
-        // Pseudo-random deterministic jitter based on donor ID hash
-        const hash = crypto.createHash('md5').update(d.id).digest('hex');
-        const offsetLat = ((parseInt(hash.substring(0, 4), 16) % 200) - 100) / 10000; // ~1km offset
-        const offsetLng = ((parseInt(hash.substring(4, 8), 16) % 200) - 100) / 10000;
+    // PRIVACY ENFORCEMENT (Sections 2, 6, 25):
+    // 1. Rare donors NEVER appear as map markers under any circumstance.
+    // 2. Standard donors are strictly aggregated at municipal/city centroid level.
+    // 3. Cities with donor counts below MIN_PUBLIC_AGGREGATE_THRESHOLD are suppressed to prevent enumeration.
+    const cityAggregates: Record<string, { count: number; state: string }> = {};
+    for (const d of donors) {
+      if (isRareBloodGroup(d.bloodGroup)) continue; // Double defense: exclude rare blood
+      const normalizedCity = (d.city || '').trim().toLowerCase();
+      if (!normalizedCity) continue;
+      if (!cityAggregates[normalizedCity]) {
+        cityAggregates[normalizedCity] = { count: 0, state: d.state || '' };
+      }
+      cityAggregates[normalizedCity].count++;
+    }
 
+    const safeCoordinationZones = Object.entries(cityAggregates)
+      .filter(([_, data]) => data.count >= MIN_PUBLIC_AGGREGATE_THRESHOLD)
+      .map(([cityName, data], idx) => {
+        const centroid = getCityCentroid(cityName);
+        if (!centroid) return null;
+
+        const displayName = cityName.charAt(0).toUpperCase() + cityName.slice(1);
         return {
-          zoneId: `zone_${d.id.substring(0, 8)}`,
-          bloodGroup: d.bloodGroup,
-          city: d.city,
-          state: d.state,
-          approximateLatitude: Number((d.latitude! + offsetLat).toFixed(4)),
-          approximateLongitude: Number((d.longitude! + offsetLng).toFixed(4)),
-          emergencyAvailable: d.emergencyAvailable,
-          radiusRepresentationMeters: 1200,
+          zoneId: `regional_zone_${idx + 1}`,
+          name: `Verified Regional Emergency Network (${displayName})`,
+          city: displayName,
+          state: data.state,
+          approximateLatitude: centroid.latitude,
+          approximateLongitude: centroid.longitude,
+          activeDonorsInNetwork: data.count,
+          radiusRepresentationMeters: 5000, // Coarse 5km regional circle
         };
-      });
+      })
+      .filter(Boolean);
 
     sendSuccess(res, {
       requests: activeRequests.filter((r) => r.latitude && r.longitude),
       hospitals: hospitals.filter((h) => h.latitude && h.longitude),
       bloodBanks: bloodBanks.filter((b) => b.latitude && b.longitude),
-      donorZones: fuzzedDonorZones,
+      donorZones: safeCoordinationZones,
     });
   } catch (error) {
     next(error);

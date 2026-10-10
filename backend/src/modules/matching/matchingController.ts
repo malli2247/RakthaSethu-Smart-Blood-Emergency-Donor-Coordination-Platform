@@ -68,17 +68,9 @@ export async function findDonors(req: Request, res: Response, next: NextFunction
           },
           message:
             candidates.length > 0
-              ? 'Potential compatible rare donors are registered in the regional emergency network. In accordance with clinical privacy protocols, individual identities and locations remain confidential until an authenticated emergency request is broadcast.'
+              ? 'A compatible donor may be available in the regional network. Submit an authenticated emergency request to initiate secure clinical dispatch.'
               : 'Currently no suitable rare donor has been identified in this radius. Broadcast an emergency request to initiate statewide progressive matching.',
-          // Privacy-safe pseudo-candidates without raw donorId or exact km
-          candidates: candidates.map((c, i) => ({
-            matchReference: `VOLUNTEER-${i + 1}`,
-            compatibilityStatus: 'COMPATIBLE',
-            availabilityStatus: c.isAvailable ? 'AVAILABLE' : 'STANDBY',
-            verificationStatus: 'VERIFIED',
-            distanceBand: c.distanceBand,
-            regionLabel: c.city ? `${c.city} Region` : 'Regional Area',
-          })),
+          candidates: [],
         },
         candidates.length > 0
           ? 'Potential compatible rare donors identified in network'
@@ -209,7 +201,19 @@ export async function runMatchingForRequest(req: Request, res: Response, next: N
   try {
     const { requestId } = req.params;
     const candidates = await MatchingService.matchRequest(requestId);
-    sendSuccess(res, candidates, `Matching engine notified ${candidates.length} candidate(s)`);
+    sendSuccess(
+      res,
+      {
+        status: candidates.length > 0 ? 'POTENTIAL_DONOR_IDENTIFIED' : 'MATCHING_IN_PROGRESS',
+        requestId,
+        candidatesContacted: candidates.length,
+        message:
+          candidates.length > 0
+            ? 'A compatible donor may be available. The donor has been notified.'
+            : 'We are securely searching for compatible donors.',
+      },
+      `Matching engine notified ${candidates.length} candidate(s)`
+    );
   } catch (error) {
     next(error);
   }

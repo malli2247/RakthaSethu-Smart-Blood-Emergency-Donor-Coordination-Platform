@@ -10,6 +10,7 @@ import { ResponsePredictionService } from '../modules/ml/responsePredictionServi
 import { RealtimeEventService } from './realtimeEventService';
 import { NotificationService } from './notificationService';
 import { isRareBloodGroup, getCoarseDistanceBand } from '../utils/rareBloodClassification';
+import { getPrivacySafeCount, MIN_PUBLIC_AGGREGATE_THRESHOLD } from '../utils/privacyTiers';
 
 export interface ProgressiveSearchStep {
   radiusKm: number;
@@ -57,6 +58,7 @@ export interface ScoredDonorCandidate {
   emergencyAvailable: boolean;
   isPhoneVerified: boolean;
   discoveredAtRadiusKm: number;
+  distanceBand?: string;
 }
 
 export interface ProgressiveSearchResult {
@@ -441,6 +443,7 @@ export class ProgressiveDonorSearchService {
           emergencyAvailable: donor.emergencyAvailable,
           isPhoneVerified: Boolean(donor.isPhoneVerified || donor.user?.isPhoneVerified),
           discoveredAtRadiusKm: currentRadius,
+          distanceBand: getCoarseDistanceBand(distanceKm, isRareBloodGroup(job.request.bloodGroup)),
         };
 
         job.alreadyMatchedDonorIds.add(donor.id);
@@ -448,10 +451,25 @@ export class ProgressiveDonorSearchService {
         job.cumulativeCandidates.push(candidate);
         newDonorsAtRadius++;
 
-        // Emit candidate_found
+        // Emit candidate_found with strict privacy protection (Sections 2, 6, 11, 26)
+        const isRare = isRareBloodGroup(job.request.bloodGroup);
+        const safeCandidatePayload = {
+          matchReference: `VOLUNTEER-${job.cumulativeCandidates.length}`,
+          compatibilityStatus: 'COMPATIBLE',
+          availabilityStatus: candidate.isAvailable ? 'AVAILABLE' : 'STANDBY',
+          verificationStatus: 'VERIFIED',
+          distanceBand: getCoarseDistanceBand(candidate.distanceKm, isRare),
+          regionLabel: candidate.city ? `${candidate.city} Area` : 'Regional Area',
+          bloodGroup: candidate.bloodGroup,
+          bloodGroupLabel: candidate.bloodGroupLabel,
+        };
+
         this.emitEvent(job, 'candidate_found', {
-          radiusKm: currentRadius,
-          candidate,
+          // Anti-triangulation: Never emit which exact radius discovered a rare donor
+          ...(isRare ? {} : { radiusKm: currentRadius }),
+          candidate: safeCandidatePayload,
+          status: 'POTENTIAL_DONOR_IDENTIFIED',
+          message: 'Potential compatible donor identified in the emergency network.',
           cumulativeCount: job.cumulativeCandidates.length,
         });
 
@@ -619,10 +637,20 @@ export class ProgressiveDonorSearchService {
         },
       });
 
+      const isRare = isRareBloodGroup(job.request.bloodGroup);
+      const notifTitle = isRare
+        ? 'Urgent Blood Match Alert'
+        : job.urgency === 'CRITICAL'
+        ? `🚨 CRITICAL BLOOD MATCH (${job.request.bloodGroup})`
+        : `Urgent Blood Match (${job.request.bloodGroup})`;
+      const notifMessage = isRare
+        ? 'An urgent blood request may match your donation preferences. Open RakthaSethu to review.'
+        : `A verified emergency patient requires ${job.request.unitsRequired} unit(s) of ${job.request.bloodGroup} at ${job.request.hospitalName} (${c.distanceBand}). Open RakthaSethu to respond.`;
+
       NotificationService.notify({
         userId: c.userId,
-        title: job.urgency === 'CRITICAL' ? `🚨 CRITICAL BLOOD MATCH (${job.request.bloodGroup})` : `Urgent Blood Match (${job.request.bloodGroup})`,
-        message: `${job.request.patientName} urgently requires ${job.request.unitsRequired} unit(s) of ${job.request.bloodGroup} at ${job.request.hospitalName} (${c.distanceKm ? `${c.distanceKm.toFixed(1)} km` : 'nearby'}).`,
+        title: notifTitle,
+        message: notifMessage,
         type: job.urgency === 'CRITICAL' ? 'CRITICAL_BLOOD_REQUEST' : 'URGENT_BLOOD_REQUEST',
         priority: job.urgency === 'CRITICAL' ? 'CRITICAL' : 'URGENT',
         category: 'MATCH',
@@ -632,12 +660,13 @@ export class ProgressiveDonorSearchService {
           requestId: job.requestId,
           bloodGroup: job.request.bloodGroup,
           unitsRequired: job.request.unitsRequired,
-          hospitalName: job.request.hospitalName,
-          distanceKm: c.distanceKm,
+          distanceBand: c.distanceBand,
         },
         sms: {
           to: c.maskedPhone,
-          message: `[RakthaSethu Emergency] ${job.request.bloodGroup} needed at ${job.request.hospitalName}. Open RakthaSethu to respond.`,
+          message: isRare
+            ? '[RakthaSethu Emergency] An urgent request may match your donation preferences. Open RakthaSethu to respond.'
+            : `[RakthaSethu Emergency] Urgent blood match needed in your area. Open RakthaSethu to respond.`,
         },
       }).catch((err) => logger.warn('[ProgressiveSearch] Notification dispatch warning', err));
     }
@@ -894,18 +923,21 @@ export class ProgressiveDonorSearchService {
         urgency: job.urgency,
         currentRadiusKm: job.currentRadiusKm,
         sequence: job.sequence,
-        targetDonorsNeeded: job.targetDonorsNeeded,
-        cumulativeDonors: job.cumulativeCandidates.length,
-        candidates: job.cumulativeCandidates.map((c, idx) => ({
-          matchReference: `VOLUNTEER-${idx + 1}`,
-          compatibilityStatus: 'COMPATIBLE',
-          availabilityStatus: c.isAvailable ? 'AVAILABLE' : 'STANDBY',
-          verificationStatus: 'VERIFIED',
-          distanceBand: getCoarseDistanceBand(c.distanceKm, isRareBloodGroup(job.request.bloodGroup)),
-          regionLabel: c.city ? `${c.city} District` : 'Regional Area',
-          bloodGroup: c.bloodGroup,
-          bloodGroupLabel: c.bloodGroupLabel,
-        })),
+        cumulativeDonors: isRareBloodGroup(job.request.bloodGroup)
+          ? getPrivacySafeCount(job.cumulativeCandidates.length).displayValue
+          : job.cumulativeCandidates.length,
+        candidates: isRareBloodGroup(job.request.bloodGroup)
+          ? [] // Sections 2 & 8: Never return individual pseudo-candidates array for rare blood groups
+          : job.cumulativeCandidates.map((c, idx) => ({
+              matchReference: `VOLUNTEER-${idx + 1}`,
+              compatibilityStatus: 'COMPATIBLE',
+              availabilityStatus: c.isAvailable ? 'AVAILABLE' : 'STANDBY',
+              verificationStatus: 'VERIFIED',
+              distanceBand: getCoarseDistanceBand(c.distanceKm, false),
+              regionLabel: c.city ? `${c.city} District` : 'Regional Area',
+              bloodGroup: c.bloodGroup,
+              bloodGroupLabel: c.bloodGroupLabel,
+            })),
         searchSteps: job.searchSteps,
         metrics: Array.from(job.metricsByRadius.values()),
         escalationPlan: job.escalationPlan,
@@ -960,16 +992,19 @@ export class ProgressiveDonorSearchService {
       },
     });
 
-    const candidates: any[] = matches.map((m, idx) => ({
-      matchReference: `VOLUNTEER-${idx + 1}`,
-      compatibilityStatus: 'COMPATIBLE',
-      availabilityStatus: m.status === 'ACCEPTED' ? 'ACCEPTED' : 'STANDBY',
-      verificationStatus: 'VERIFIED',
-      distanceBand: getCoarseDistanceBand(m.distanceKm, isRareBloodGroup(dbSearch.request.bloodGroup)),
-      regionLabel: m.donor.city ? `${m.donor.city} District` : 'Regional Area',
-      bloodGroup: m.donor.bloodGroup,
-      bloodGroupLabel: m.donor.bloodGroup.replace('_POSITIVE', '+').replace('_NEGATIVE', '-'),
-    }));
+    const isRare = isRareBloodGroup(dbSearch.request.bloodGroup);
+    const candidates: any[] = isRare
+      ? []
+      : matches.map((m, idx) => ({
+          matchReference: `VOLUNTEER-${idx + 1}`,
+          compatibilityStatus: 'COMPATIBLE',
+          availabilityStatus: m.status === 'ACCEPTED' ? 'ACCEPTED' : 'STANDBY',
+          verificationStatus: 'VERIFIED',
+          distanceBand: getCoarseDistanceBand(m.distanceKm, false),
+          regionLabel: m.donor.city ? `${m.donor.city} District` : 'Regional Area',
+          bloodGroup: m.donor.bloodGroup,
+          bloodGroupLabel: m.donor.bloodGroup.replace('_POSITIVE', '+').replace('_NEGATIVE', '-'),
+        }));
 
     return {
       searchId: dbSearch.id,
@@ -980,7 +1015,9 @@ export class ProgressiveDonorSearchService {
       currentRadiusKm: dbSearch.currentRadiusKm,
       sequence: config.matching?.sequencesByUrgency?.[dbSearch.urgency as 'NORMAL' | 'HIGH' | 'CRITICAL'] || [5, 7, 9, 10, 15, 20, 25, 50, 100],
       targetDonorsNeeded: dbSearch.targetDonorsNeeded,
-      cumulativeDonors: dbSearch.donorsFoundCount,
+      cumulativeDonors: isRare
+        ? getPrivacySafeCount(dbSearch.donorsFoundCount).displayValue
+        : dbSearch.donorsFoundCount,
       candidates,
       searchSteps: dbSearch.radiusAttempts.map((a) => ({
         radiusKm: a.radiusKm,

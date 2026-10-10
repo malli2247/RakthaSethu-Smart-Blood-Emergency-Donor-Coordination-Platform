@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import {
   getDonorProfile,
   updateDonorProfile,
@@ -6,6 +6,8 @@ import {
   getDonorMatches,
   getDonationHistory,
   recordPastDonation,
+  updateDonorConsent,
+  withdrawDonorConsent,
 } from './donorController';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -16,6 +18,8 @@ donorRouter.use(requireRole('DONOR', 'ADMIN'));
 
 donorRouter.get('/profile', getDonorProfile);
 donorRouter.patch('/profile', updateDonorProfile);
+donorRouter.patch('/consent', updateDonorConsent);
+donorRouter.post('/consent/withdraw', withdrawDonorConsent);
 donorRouter.get('/stats', getDonorStats);
 donorRouter.get('/matches', getDonorMatches);
 donorRouter.get('/history', getDonationHistory);
