@@ -1,4 +1,5 @@
 import { config } from '../../config';
+import { logger } from '../../utils/logger';
 import { BloodGroupType, canDonateTo } from '../../utils/compatibility';
 
 export interface AiClassificationResult {
@@ -101,10 +102,10 @@ export class AiService {
 
     // Section 18: Anti-Enumeration & Donor Privacy Guardrail
     const privacyViolationPatterns = [
-      /list\s+(all\s+)?(rare\s+)?donors/i,
-      /show\s+(me\s+)?donors/i,
+      /list\s+.*donors/i,
+      /show\s+.*donors/i,
       /give\s+me\s+(the\s+)?(phone|number|contact)/i,
-      /phone\s+number\s+of/i,
+      /phone\s+(number|numbers)/i,
       /where\s+is\s+the\s+nearest\s+(rare\s+)?donor/i,
       /nearest\s+(rare\s+)?donor/i,
       /how\s+many\s+.*donors(\s+in|\s+near|\s+are|\?|$)/i,
@@ -112,8 +113,9 @@ export class AiService {
       /which\s+donor\s+donated/i,
       /who\s+donated\s+most\s+recently/i,
       /contact\s+details\s+of\s+donor/i,
-      /donor\s+address/i,
-      /donor\s+coordinates/i,
+      /donor\s+(address|coordinates|phone|location)/i,
+      /(phone|contact|address).*donor/i,
+      /donor.*(phone|contact|address)/i,
     ];
 
     if (privacyViolationPatterns.some((pattern) => pattern.test(question))) {
@@ -129,6 +131,86 @@ export class AiService {
       };
     }
 
+    // If Gemini API is configured, attempt live generation with medical guardrails
+    if (config.ai.apiKey && config.ai.enabled !== false) {
+      try {
+        const geminiResponse = await this.queryGemini(question);
+        if (geminiResponse) {
+          return {
+            reply: geminiResponse,
+            disclaimer,
+            suggestedFollowUps: [
+              'How does privacy-preserving donor matching work?',
+              'How do I create an emergency blood request?',
+              'Who is eligible to donate blood?',
+            ],
+          };
+        }
+      } catch (err: any) {
+        logger.warn('[AiService] Gemini API query failed or timed out. Falling back to heuristic engine.');
+      }
+    }
+
+    // Clinical Heuristic Knowledge Base Fallback
+    return this.heuristicAnswer(q, disclaimer);
+  }
+
+  /**
+   * Safe, non-blocking call to Google Gemini REST API
+   */
+  private static async queryGemini(userPrompt: string): Promise<string | null> {
+    const apiKey = config.ai.apiKey;
+    const model = config.ai.model || 'gemini-1.5-flash';
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+      model
+    )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const systemInstruction = `You are the RakthaSethu AI Assistant, a compassionate and knowledgeable healthcare assistant supporting blood emergency and voluntary donation coordination in India.
+CRITICAL SAFETY & PRIVACY DIRECTIVES:
+1. Medical Disclaimer: Provide informational guidance only. Do NOT diagnose, prescribe, determine donor clinical medical eligibility, or override medical professionals. Always remind the user to consult an attending physician or local emergency services.
+2. Donor Privacy: Never output, search for, or estimate private donor personal details, full names, phone numbers, email addresses, or exact GPS coordinates.
+3. Language: Respond in the language queried (English, Hindi, or Telugu).
+4. Tone: Concise, professional, healthcare-focused, and calm. Max 3-4 paragraphs.`;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: `${systemInstruction}\n\nUser Question: ${userPrompt}` }],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 500,
+          temperature: 0.2,
+        },
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      logger.warn(`[AiService] Gemini returned HTTP ${res.status}: ${errText.substring(0, 150)}`);
+      return null;
+    }
+
+    const data: any = await res.json();
+    const candidate = data.candidates?.[0];
+    const textPart = candidate?.content?.parts?.[0]?.text;
+
+    return textPart ? textPart.trim() : null;
+  }
+
+  /**
+   * Internal Clinical Heuristic Knowledge Base
+   */
+  private static heuristicAnswer(q: string, disclaimer: string): AiChatbotResponse {
     if (q.includes('o-') || q.includes('o negative')) {
       return {
         reply:
@@ -169,7 +251,7 @@ export class AiService {
     if (q.includes('emergency') || q.includes('urgent') || q.includes('what should i do')) {
       return {
         reply:
-          'During a blood emergency:\n1. **Create an Emergency Request** immediately on RakthaSethu by clicking "Need Blood Now". Specify the exact blood group, hospital name, and units.\n2. **Contact Hospital Blood Bank**: Ensure the attending physician has issued a requisition form and blood sample for cross-matching.\n3. **Coordinate with Donors**: As soon as donors accept your request on RakthaSethu, call them directly or use the platform contact button.\n4. **Reach Out to Volunteers**: Our verified volunteer network is notified for Critical emergency requests to coordinate transport if necessary.',
+          'During a blood emergency:\n1. **Create an Emergency Request** immediately on RakthaSethu by clicking "Need Blood Now". Specify the exact blood group, hospital name, and units.\n2. **Contact Hospital Blood Bank**: Ensure the attending physician has issued a requisition form and blood sample for cross-matching.\n3. **Coordinate with Donors**: As soon as donors accept your request on RakthaSethu, call them directly or use the platform contact button.\n4. **Reach Reach Out to Volunteers**: Our verified volunteer network is notified for Critical emergency requests to coordinate transport if necessary.',
         disclaimer,
         suggestedFollowUps: [
           'How fast does RakthaSethu match donors?',
@@ -200,5 +282,79 @@ export class AiService {
         'What should I do during a blood emergency?',
       ],
     };
+  }
+
+  /**
+   * Health and connectivity check for Google Gemini AI.
+   * Never leaks API key.
+   */
+  static async checkHealth(): Promise<{
+    status: 'configured' | 'unavailable' | 'needs verification';
+    details: string;
+    model: string;
+    latencyMs?: number;
+  }> {
+    const apiKey = config.ai.apiKey;
+    const model = config.ai.model || 'gemini-1.5-flash';
+
+    if (!apiKey) {
+      return {
+        status: 'unavailable',
+        details: 'GEMINI_API_KEY is not configured. Built-in clinical heuristic engine active.',
+        model,
+      };
+    }
+
+    const start = Date.now();
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+        model
+      )}?key=${encodeURIComponent(apiKey)}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+      const res = await fetch(endpoint, { signal: controller.signal });
+      clearTimeout(timeoutId);
+      const latencyMs = Date.now() - start;
+
+      if (res.ok) {
+        return {
+          status: 'configured',
+          details: `Google Gemini AI connected successfully (${model}).`,
+          model,
+          latencyMs,
+        };
+      } else if (res.status === 400 || res.status === 403) {
+        return {
+          status: 'needs verification',
+          details: `Gemini API key rejected or model ${model} not permitted. Check Google AI Studio permissions.`,
+          model,
+          latencyMs,
+        };
+      } else if (res.status === 429) {
+        return {
+          status: 'needs verification',
+          details: 'Gemini API rate limit or quota exceeded (HTTP 429).',
+          model,
+          latencyMs,
+        };
+      } else {
+        return {
+          status: 'needs verification',
+          details: `Gemini endpoint returned HTTP ${res.status}.`,
+          model,
+          latencyMs,
+        };
+      }
+    } catch (err: any) {
+      const latencyMs = Date.now() - start;
+      return {
+        status: 'unavailable',
+        details: err?.name === 'AbortError' ? 'Gemini API health check timed out (4s).' : 'Unable to reach Google Gemini API.',
+        model,
+        latencyMs,
+      };
+    }
   }
 }

@@ -427,16 +427,21 @@ export async function getSystemHealth(req: Request, res: Response, next: NextFun
   try {
     const { config, checkProductionEnvironment } = await import('../../config');
     const { RealtimeNotificationService } = await import('../../services/realtimeNotificationService');
+    const { MapsService } = await import('../../services/mapsService');
+    const { AiService } = await import('../ai/aiService');
+    const { EmailService } = await import('../../services/emailService');
+    const { SmsService } = await import('../../services/smsService');
+    const { WebPushService } = await import('../../services/webPushService');
 
     // 1. Check database latency & connectivity
     const dbStart = Date.now();
-    let dbStatus = 'Healthy';
+    let dbStatus: 'connected' | 'unavailable' = 'connected';
     let dbLatencyMs = 0;
     try {
       await prisma.$queryRaw`SELECT 1`;
       dbLatencyMs = Date.now() - dbStart;
     } catch {
-      dbStatus = 'Degraded';
+      dbStatus = 'unavailable';
     }
 
     // 2. Check auth
@@ -446,36 +451,109 @@ export async function getSystemHealth(req: Request, res: Response, next: NextFun
     const sseClients = RealtimeNotificationService.getActiveSubscribersCount();
     const notificationStatus = 'Healthy';
 
-    // 4. SMS provider check
-    const smsStatus = config.sms.provider === 'twilio' && config.sms.twilioAccountSid
-      ? 'Configured'
-      : 'Simulated / Safe Mode';
+    // 4. Run non-intrusive safe integration health checks in parallel
+    const [mapsHealth, aiHealth, emailHealth, smsHealth, pushHealth] = await Promise.all([
+      MapsService.checkHealth().catch(() => ({
+        status: 'unavailable' as const,
+        details: 'Maps service health check failed.',
+        provider: 'haversine-local' as const,
+        latencyMs: undefined as number | undefined,
+      })),
+      AiService.checkHealth().catch(() => ({
+        status: 'unavailable' as const,
+        details: 'AI service health check failed.',
+        model: config.ai.model || 'gemini-1.5-flash',
+        latencyMs: undefined as number | undefined,
+      })),
+      EmailService.checkHealth().catch(() => ({
+        status: 'unavailable' as const,
+        provider: 'mock' as const,
+        details: 'Email service health check failed.',
+        latencyMs: undefined as number | undefined,
+      })),
+      SmsService.checkHealth().catch(() => ({
+        status: 'unavailable' as const,
+        provider: 'mock',
+        details: 'SMS/OTP service health check failed.',
+        latencyMs: undefined as number | undefined,
+      })),
+      WebPushService.checkHealth().catch(() => ({
+        status: 'unavailable' as const,
+        details: 'Push service health check failed.',
+        activeSubscriptions: 0,
+        vapidSubject: '',
+      })),
+    ]);
 
-    // 5. Email provider check
-    const emailStatus = config.email.smtpUser
-      ? 'Configured'
-      : 'Simulated / Safe Mode';
-
-    // 6. Push notifications
-    const pushStatus = config.push.vapidPublicKey && config.push.vapidPrivateKey
-      ? 'Configured'
-      : 'Not Configured';
-
-    // 7. Safe environment audit
+    // 5. Safe environment audit
     const environmentAudit = checkProductionEnvironment();
 
-    sendSuccess(res, {
-      database: { status: dbStatus, latencyMs: dbLatencyMs },
-      auth: { status: authStatus },
-      notificationService: { status: notificationStatus, activeStreams: sseClients },
-      pushService: { status: pushStatus },
-      emailService: { status: emailStatus },
-      smsService: { status: smsStatus },
-      mapService: { status: 'Healthy' },
-      aiService: { status: 'Healthy' },
-      environmentAudit,
-      timestamp: new Date().toISOString(),
-    }, 'System health check completed');
+    sendSuccess(
+      res,
+      {
+        integrations: {
+          maps: {
+            status: mapsHealth.status,
+            details: mapsHealth.details,
+            provider: mapsHealth.provider,
+            latencyMs: mapsHealth.latencyMs,
+          },
+          gemini: {
+            status: aiHealth.status,
+            details: aiHealth.details,
+            model: aiHealth.model,
+            latencyMs: aiHealth.latencyMs,
+          },
+          email: {
+            status: emailHealth.status,
+            details: emailHealth.details,
+            provider: emailHealth.provider,
+            latencyMs: emailHealth.latencyMs,
+          },
+          otp: {
+            status: smsHealth.status,
+            details: smsHealth.details,
+            provider: smsHealth.provider,
+            latencyMs: smsHealth.latencyMs,
+          },
+          push: {
+            status: pushHealth.status,
+            details: pushHealth.details,
+            activeSubscriptions: pushHealth.activeSubscriptions,
+          },
+          database: {
+            status: dbStatus,
+            latencyMs: dbLatencyMs,
+          },
+        },
+        database: { status: dbStatus === 'connected' ? 'Healthy' : 'Degraded', latencyMs: dbLatencyMs },
+        auth: { status: authStatus },
+        notificationService: { status: notificationStatus, activeStreams: sseClients },
+        pushService: { status: pushHealth.status === 'configured' ? 'Configured' : 'Not Configured' },
+        emailService: { status: emailHealth.status === 'configured' ? 'Configured' : 'Simulated / Safe Mode' },
+        smsService: { status: smsHealth.status === 'configured' ? 'Configured' : 'Simulated / Safe Mode' },
+        mapService: { status: mapsHealth.status === 'configured' ? 'Configured' : 'Fallback (Haversine)' },
+        aiService: { status: aiHealth.status === 'configured' ? 'Configured' : 'Fallback (Clinical Heuristics)' },
+        environmentAudit,
+        timestamp: new Date().toISOString(),
+      },
+      'System health check completed'
+    );
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function testEmailIntegration(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { toEmail } = req.body;
+    const recipient = toEmail || req.user?.email;
+    if (!recipient) {
+      throw new AppError('Recipient email address is required.', 400);
+    }
+    const { EmailService } = await import('../../services/emailService');
+    const result = await EmailService.sendDiagnosticTestEmail(recipient);
+    sendSuccess(res, result, result.details);
   } catch (error) {
     next(error);
   }

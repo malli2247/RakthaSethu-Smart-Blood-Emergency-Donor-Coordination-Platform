@@ -9,6 +9,13 @@ interface SendMailOptions {
   text?: string;
 }
 
+export interface EmailHealthStatus {
+  status: 'configured' | 'unavailable' | 'needs verification';
+  provider: 'resend' | 'smtp' | 'mock';
+  details: string;
+  latencyMs?: number;
+}
+
 export class EmailService {
   private static transporter: Transporter | null = null;
 
@@ -33,16 +40,70 @@ export class EmailService {
     return null;
   }
 
-  static async sendMail(options: SendMailOptions): Promise<{ success: boolean; simulated?: boolean }> {
+  static async sendMail(options: SendMailOptions): Promise<{ success: boolean; simulated?: boolean; provider?: string }> {
     const { to, subject, html, text } = options;
     const plainText = text || html.replace(/<[^>]+>/g, ' ');
 
+    // 1. Resend Provider (Official REST API)
+    if (config.email.provider === 'resend' || (config.email.resendApiKey && config.email.provider !== 'smtp')) {
+      if (!config.email.resendApiKey) {
+        if (config.isProduction) {
+          logger.warn('[Email Service] RESEND_API_KEY is not configured in production.');
+          return { success: false, provider: 'resend' };
+        }
+        logger.info(`[Email Service - Simulated Mode] To: ${to} | Subject: "${subject}"`);
+        return { success: true, simulated: true, provider: 'mock' };
+      }
+
+      // Send via Resend with bounded retry
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          const res = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${config.email.resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: config.email.fromAddress,
+              to: [to],
+              subject,
+              html,
+              text: plainText,
+            }),
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            logger.info(`[Email Service - Resend Dispatched] To: ${to} | Subject: "${subject}"`);
+            return { success: true, provider: 'resend' };
+          }
+
+          const errText = await res.text().catch(() => '');
+          logger.warn(`[Email Service - Resend Error] Attempt ${attempt} HTTP ${res.status}: ${errText}`);
+          // Do not retry 4xx errors (e.g. invalid key, invalid email format)
+          if (res.status >= 400 && res.status < 500) {
+            return { success: false, provider: 'resend' };
+          }
+        } catch (err: any) {
+          logger.warn(`[Email Service - Resend Exception] Attempt ${attempt}: ${err?.message || err}`);
+        }
+      }
+
+      return { success: false, provider: 'resend' };
+    }
+
+    // 2. SMTP Provider
     try {
       const transporter = this.getTransporter();
 
       if (!transporter || config.email.provider === 'mock') {
         logger.info('[Email Service - Simulated Mode] To: ' + to + ' | Subject: "' + subject + '"');
-        return { success: true, simulated: true };
+        return { success: true, simulated: true, provider: 'mock' };
       }
 
       await transporter.sendMail({
@@ -54,11 +115,156 @@ export class EmailService {
       });
 
       logger.info('[Email Service - Dispatched] To: ' + to + ' | Subject: "' + subject + '"');
-      return { success: true };
+      return { success: true, provider: 'smtp' };
     } catch (error: any) {
       logger.error('[Email Service - Dispatch Failure] Failed sending to ' + to + ' ("' + subject + '")', error);
-      return { success: false };
+      return { success: false, provider: 'smtp' };
     }
+  }
+
+  /**
+   * Safe Health Check for Email Service without sending unsolicited messages.
+   */
+  static async checkHealth(): Promise<EmailHealthStatus> {
+    const start = Date.now();
+
+    // Check Resend
+    if (config.email.provider === 'resend' || config.email.resendApiKey) {
+      if (!config.email.resendApiKey) {
+        return {
+          status: 'unavailable',
+          provider: 'resend',
+          details: 'RESEND_API_KEY is not configured.',
+        };
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch('https://api.resend.com/api-keys', {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${config.email.resendApiKey}`,
+          },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - start;
+
+        if (res.ok) {
+          return {
+            status: 'configured',
+            provider: 'resend',
+            details: `Resend API verified successfully. Sender: ${config.email.fromAddress}`,
+            latencyMs,
+          };
+        } else if (res.status === 401 || res.status === 403) {
+          return {
+            status: 'needs verification',
+            provider: 'resend',
+            details: 'RESEND_API_KEY was rejected by Resend API (HTTP 401/403).',
+            latencyMs,
+          };
+        } else {
+          return {
+            status: 'needs verification',
+            provider: 'resend',
+            details: `Resend API returned HTTP ${res.status}.`,
+            latencyMs,
+          };
+        }
+      } catch (err: any) {
+        const latencyMs = Date.now() - start;
+        return {
+          status: 'unavailable',
+          provider: 'resend',
+          details: err?.name === 'AbortError' ? 'Resend API connection timed out (4s).' : 'Unable to reach Resend API.',
+          latencyMs,
+        };
+      }
+    }
+
+    // Check SMTP
+    if (config.email.provider === 'smtp') {
+      if (!config.email.smtpUser || !config.email.smtpPass) {
+        return {
+          status: 'unavailable',
+          provider: 'smtp',
+          details: 'SMTP_USER or SMTP_PASS is missing.',
+        };
+      }
+
+      try {
+        const transporter = this.getTransporter();
+        if (!transporter) {
+          return {
+            status: 'unavailable',
+            provider: 'smtp',
+            details: 'SMTP transporter could not be initialized.',
+          };
+        }
+
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('SMTP verify timed out')), 4000);
+          transporter.verify((error: any) => {
+            clearTimeout(timeout);
+            if (error) reject(error);
+            else resolve(true);
+          });
+        });
+
+        const latencyMs = Date.now() - start;
+        return {
+          status: 'configured',
+          provider: 'smtp',
+          details: `SMTP server verified (${config.email.smtpHost}:${config.email.smtpPort}).`,
+          latencyMs,
+        };
+      } catch (err: any) {
+        const latencyMs = Date.now() - start;
+        return {
+          status: 'needs verification',
+          provider: 'smtp',
+          details: `SMTP verification failed: ${err?.message || 'Connection error'}.`,
+          latencyMs,
+        };
+      }
+    }
+
+    return {
+      status: 'unavailable',
+      provider: 'mock',
+      details: 'Email provider set to simulated mock mode. Outgoing emails are simulated in logs.',
+    };
+  }
+
+  /**
+   * Diagnostic test email sent strictly to an authorized administrator address.
+   */
+  static async sendDiagnosticTestEmail(toEmail: string): Promise<{ success: boolean; details: string }> {
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+        <div style="background-color: #e11d48; padding: 16px; border-radius: 6px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 20px;">RakthaSethu — Email Integration Test</h1>
+        </div>
+        <div style="padding: 20px 0;">
+          <p style="color: #334155;">This is an automated diagnostic test email sent from RakthaSethu at ${new Date().toISOString()}.</p>
+          <p style="color: #10b981; font-weight: bold;">✅ Email provider integration is working properly.</p>
+        </div>
+      </div>
+    `;
+
+    const res = await this.sendMail({
+      to: toEmail,
+      subject: 'RakthaSethu — Diagnostic Test Email',
+      html,
+    });
+
+    return {
+      success: res.success,
+      details: res.simulated ? 'Email simulated in development mode.' : res.success ? 'Email successfully delivered.' : 'Provider dispatch failed.',
+    };
   }
 
   static async sendVerificationEmail(to: string, name: string, token: string): Promise<boolean> {

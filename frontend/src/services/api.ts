@@ -219,6 +219,7 @@ export const adminApi = {
     data: { action: 'FORCE_FULFILL' | 'RESTART_MATCHING' | 'CANCEL'; notes?: string }
   ) => api.post(`/admin/requests/${id}/resolve`, data),
   getSystemHealth: () => api.get('/admin/system-health'),
+  testEmail: (toEmail?: string) => api.post('/admin/test-email', { toEmail }),
   getLiveEmergencies: () => api.get('/admin/live-emergencies'),
 };
 

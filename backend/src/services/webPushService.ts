@@ -360,4 +360,55 @@ export class WebPushService {
       logger.warn('[WebPushService] Failed to record notification click:', err);
     }
   }
+
+  /**
+   * Health check for Web Push & VAPID configuration
+   */
+  static async checkHealth(): Promise<{
+    status: 'configured' | 'unavailable' | 'needs verification';
+    details: string;
+    activeSubscriptions: number;
+    vapidSubject: string;
+  }> {
+    const hasPublic = Boolean(config.push.vapidPublicKey && config.push.vapidPublicKey.length >= 60);
+    const hasPrivate = Boolean(config.push.vapidPrivateKey && config.push.vapidPrivateKey.length >= 30);
+    const hasSubject = Boolean(
+      config.push.vapidSubject &&
+        (config.push.vapidSubject.startsWith('mailto:') || config.push.vapidSubject.startsWith('http'))
+    );
+
+    let activeSubscriptions = 0;
+    try {
+      activeSubscriptions = await prisma.pushSubscription.count({
+        where: { isActive: true },
+      });
+    } catch {
+      // Prisma count fallback if db offline
+    }
+
+    if (!hasPublic || !hasPrivate) {
+      return {
+        status: 'unavailable',
+        details: 'VAPID keys not configured. Web Push notifications are disabled.',
+        activeSubscriptions,
+        vapidSubject: config.push.vapidSubject || '',
+      };
+    }
+
+    if (!hasSubject) {
+      return {
+        status: 'needs verification',
+        details: 'VAPID_SUBJECT must be a valid mailto: or https: URL.',
+        activeSubscriptions,
+        vapidSubject: config.push.vapidSubject || '',
+      };
+    }
+
+    return {
+      status: 'configured',
+      details: `VAPID keys configured (${activeSubscriptions} active device subscriptions registered).`,
+      activeSubscriptions,
+      vapidSubject: config.push.vapidSubject,
+    };
+  }
 }

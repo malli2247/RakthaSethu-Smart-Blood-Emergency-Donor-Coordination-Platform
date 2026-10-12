@@ -11,6 +11,7 @@ import {
   resolveRequestIssue,
   getSystemHealth,
   getLiveEmergencies,
+  testEmailIntegration,
 } from './adminController';
 import { authenticateToken, requireRole } from '../../middleware/auth';
 
@@ -21,6 +22,7 @@ adminRouter.use(requireRole('ADMIN'));
 
 adminRouter.get('/stats', getAdminStats);
 adminRouter.get('/system-health', getSystemHealth);
+adminRouter.post('/test-email', testEmailIntegration);
 adminRouter.get('/live-emergencies', getLiveEmergencies);
 adminRouter.get('/users', listAllUsers);
 adminRouter.get('/users/:id', getUserById);

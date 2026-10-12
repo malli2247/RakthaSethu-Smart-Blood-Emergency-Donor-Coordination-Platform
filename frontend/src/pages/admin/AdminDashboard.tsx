@@ -18,6 +18,13 @@ import {
   Server,
   Calendar,
   Radio,
+  MapPin,
+  Sparkles,
+  Mail,
+  Smartphone,
+  Bell,
+  Database,
+  Send,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -39,6 +46,19 @@ export const AdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
+  const handleTestEmail = async () => {
+    setSendingTestEmail(true);
+    try {
+      const res = await adminApi.testEmail();
+      setMessage(res.data?.message || 'Diagnostic test email dispatched successfully.');
+    } catch (err: any) {
+      setMessage(err?.response?.data?.message || 'Failed to dispatch diagnostic test email.');
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -465,52 +485,233 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* 6. System Health Monitoring */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between">
+      {/* 6. External Integrations & System Health Status */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Server className="w-4 h-4 text-slate-700" />
-            <h2 className="text-sm sm:text-base font-bold text-slate-900">{t('systemHealth')}</h2>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">External Integrations & Provider Health</h2>
           </div>
-          <span className="text-[11px] font-bold text-emerald-600">All Systems Operational</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTestEmail}
+              disabled={sendingTestEmail}
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold border border-slate-200 transition-colors flex items-center gap-1.5 touch-target disabled:opacity-50"
+              title="Send a safe automated test email to the logged-in administrator"
+            >
+              <Mail className={`w-3.5 h-3.5 text-rose-600 ${sendingTestEmail ? 'animate-pulse' : ''}`} />
+              <span>{sendingTestEmail ? 'Testing...' : 'Test Email Delivery'}</span>
+            </button>
+            <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Health Audit
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">Database</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            </div>
-            <div className="text-xs font-bold text-emerald-700">{systemHealth?.database?.status || 'Healthy'}</div>
-            <span className="text-[10px] text-slate-500">{systemHealth?.database?.latencyMs ?? 1} ms</span>
-          </div>
+        {/* 6-Card Grid for Required Integrations */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {/* 1. Google Maps */}
+          {(() => {
+            const mapsData = systemHealth?.integrations?.maps;
+            const status = mapsData?.status || 'unavailable';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-rose-600" />
+                    <span className="text-xs font-bold text-slate-900">Google Maps</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'configured'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : status === 'needs verification'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {mapsData?.details || 'Geocoding & GIS distance engine'}
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Provider: {mapsData?.provider || 'haversine-local'}</span>
+                  {mapsData?.latencyMs !== undefined && <span>{mapsData.latencyMs} ms</span>}
+                </div>
+              </div>
+            );
+          })()}
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">Auth</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            </div>
-            <div className="text-xs font-bold text-emerald-700">{systemHealth?.auth?.status || 'Healthy'}</div>
-            <span className="text-[10px] text-slate-500">JWT & RBAC</span>
-          </div>
+          {/* 2. Gemini AI */}
+          {(() => {
+            const aiData = systemHealth?.integrations?.gemini;
+            const status = aiData?.status || 'unavailable';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-purple-600" />
+                    <span className="text-xs font-bold text-slate-900">Gemini AI</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'configured'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : status === 'needs verification'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {aiData?.details || 'Clinical heuristics & emergency triage'}
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Model: {aiData?.model || 'gemini-1.5-flash'}</span>
+                  {aiData?.latencyMs !== undefined && <span>{aiData.latencyMs} ms</span>}
+                </div>
+              </div>
+            );
+          })()}
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">SSE Feed</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            </div>
-            <div className="text-xs font-bold text-emerald-700">{systemHealth?.notificationService?.status || 'Healthy'}</div>
-            <span className="text-[10px] text-slate-500">Active Streams</span>
-          </div>
+          {/* 3. Email (Resend / SMTP) */}
+          {(() => {
+            const emailData = systemHealth?.integrations?.email;
+            const status = emailData?.status || 'unavailable';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs font-bold text-slate-900">Email Delivery</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'configured'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : status === 'needs verification'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {emailData?.details || 'Outbound password resets & alerts'}
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Provider: {emailData?.provider || 'mock'}</span>
+                  {emailData?.latencyMs !== undefined && <span>{emailData.latencyMs} ms</span>}
+                </div>
+              </div>
+            );
+          })()}
 
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-700">Push/SMS</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            </div>
-            <div className="text-xs font-bold text-slate-800">{systemHealth?.smsService?.status || 'Safe Mode'}</div>
-            <span className="text-[10px] text-slate-500">Web Push Ready</span>
-          </div>
+          {/* 4. Mobile OTP / SMS */}
+          {(() => {
+            const otpData = systemHealth?.integrations?.otp;
+            const status = otpData?.status || 'unavailable';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-900">Mobile OTP & SMS</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'configured'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : status === 'needs verification'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {otpData?.details || 'Phone verification and emergency dispatch'}
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Provider: {otpData?.provider || 'mock'}</span>
+                  {otpData?.latencyMs !== undefined && <span>{otpData.latencyMs} ms</span>}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 5. Web Push (VAPID) */}
+          {(() => {
+            const pushData = systemHealth?.integrations?.push;
+            const status = pushData?.status || 'unavailable';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-amber-600" />
+                    <span className="text-xs font-bold text-slate-900">Web Push (VAPID)</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'configured'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : status === 'needs verification'
+                        ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                        : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  {pushData?.details || 'W3C lock-screen emergency push'}
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Subscriptions: {pushData?.activeSubscriptions ?? 0}</span>
+                  <span>Browser PWA</span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 6. Database (PostgreSQL) */}
+          {(() => {
+            const dbData = systemHealth?.integrations?.database;
+            const status = dbData?.status || 'connected';
+            return (
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Database className="w-4 h-4 text-indigo-600" />
+                    <span className="text-xs font-bold text-slate-900">PostgreSQL Database</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      status === 'connected'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-rose-100 text-rose-800 border border-rose-300'
+                    }`}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 leading-snug">
+                  Prisma ORM with connection pooling & SSL
+                </p>
+                <div className="text-[10px] text-slate-600 flex justify-between pt-1 border-t border-slate-200/60">
+                  <span>Latency: {dbData?.latencyMs ?? 1} ms</span>
+                  <span>Health: {systemHealth?.database?.status || 'Healthy'}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

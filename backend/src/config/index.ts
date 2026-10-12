@@ -52,20 +52,34 @@ export const config = {
   },
 
   email: {
-    provider: process.env.EMAIL_PROVIDER || (isProd ? 'smtp' : 'mock'),
+    provider:
+      process.env.EMAIL_PROVIDER ||
+      (process.env.RESEND_API_KEY
+        ? 'resend'
+        : process.env.SMTP_USER
+        ? 'smtp'
+        : isProd
+        ? 'resend'
+        : 'mock'),
     smtpHost: process.env.SMTP_HOST || 'smtp.mailtrap.io',
     smtpPort: parseInt(process.env.SMTP_PORT || '2525', 10),
     smtpUser: process.env.SMTP_USER || '',
     smtpPass: process.env.SMTP_PASS || '',
-    fromAddress: process.env.EMAIL_FROM || process.env.SMTP_FROM || 'RakthaSethu Alerts <alerts@rakthasethu.org>',
-    apiKey: process.env.EMAIL_API_KEY || '',
+    fromAddress:
+      process.env.RESEND_FROM_EMAIL ||
+      process.env.EMAIL_FROM ||
+      process.env.SMTP_FROM ||
+      'RakthaSethu Alerts <alerts@rakthasethu.org>',
+    apiKey: process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || '',
+    resendApiKey: process.env.RESEND_API_KEY || process.env.EMAIL_API_KEY || '',
   },
 
   sms: {
     provider:
+      process.env.OTP_PROVIDER ||
       process.env.SMS_PROVIDER ||
       (isProd
-        ? process.env.TWILIO_ACCOUNT_SID
+        ? process.env.TWILIO_ACCOUNT_SID || process.env.OTP_ACCOUNT_ID
           ? 'twilio'
           : process.env.FAST2SMS_API_KEY || process.env.FAST2SMS_KEY
           ? 'fast2sms'
@@ -75,9 +89,14 @@ export const config = {
           ? 'gateway'
           : 'twilio'
         : 'mock'),
-    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID || process.env.OTP_PROVIDER_ACCOUNT_SID || '',
+    twilioAccountSid:
+      process.env.TWILIO_ACCOUNT_SID ||
+      process.env.OTP_ACCOUNT_ID ||
+      process.env.OTP_PROVIDER_ACCOUNT_SID ||
+      '',
     twilioAuthToken:
       process.env.TWILIO_AUTH_TOKEN ||
+      process.env.OTP_AUTH_TOKEN ||
       process.env.OTP_PROVIDER_AUTH_TOKEN ||
       process.env.OTP_PROVIDER_SECRET ||
       '',
@@ -85,6 +104,10 @@ export const config = {
       process.env.TWILIO_PHONE_NUMBER ||
       process.env.OTP_PROVIDER_SENDER ||
       process.env.TWILIO_FROM ||
+      '',
+    twilioVerifyServiceId:
+      process.env.OTP_VERIFY_SERVICE_ID ||
+      process.env.TWILIO_VERIFY_SERVICE_ID ||
       '',
     fast2smsApiKey:
       process.env.FAST2SMS_API_KEY ||
@@ -112,12 +135,13 @@ export const config = {
   },
 
   maps: {
-    apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
+    apiKey: process.env.GOOGLE_MAPS_SERVER_KEY || process.env.GOOGLE_MAPS_API_KEY || '',
+    browserKey: process.env.GOOGLE_MAPS_BROWSER_KEY || '',
   },
 
   ai: {
-    apiKey: process.env.AI_API_KEY || '',
-    model: process.env.AI_MODEL || 'gemini-1.5-flash',
+    apiKey: process.env.GEMINI_API_KEY || process.env.AI_API_KEY || '',
+    model: process.env.GEMINI_MODEL || process.env.AI_MODEL || 'gemini-1.5-flash',
     enabled: process.env.ENABLE_AI_FEATURES !== 'false',
   },
 
@@ -226,11 +250,13 @@ export function checkProductionEnvironment(): Record<string, ConfigStatus> {
         : 'INVALID';
   }
 
-  // SMS PROVIDER
+  // SMS / OTP PROVIDER
   let smsStatus: ConfigStatus = 'MISSING';
   if (config.sms.provider === 'twilio') {
     smsStatus =
-      config.sms.twilioAccountSid && config.sms.twilioAuthToken && config.sms.twilioPhoneNumber
+      config.sms.twilioAccountSid &&
+      config.sms.twilioAuthToken &&
+      (config.sms.twilioPhoneNumber || config.sms.twilioVerifyServiceId)
         ? 'CONFIGURED'
         : 'MISSING';
   } else if (config.sms.provider === 'fast2sms') {
@@ -245,11 +271,19 @@ export function checkProductionEnvironment(): Record<string, ConfigStatus> {
 
   // EMAIL PROVIDER
   let emailStatus: ConfigStatus = 'MISSING';
-  if (config.email.provider === 'smtp') {
+  if (config.email.provider === 'resend') {
+    emailStatus = config.email.resendApiKey ? 'CONFIGURED' : 'MISSING';
+  } else if (config.email.provider === 'smtp') {
     emailStatus = config.email.smtpUser && config.email.smtpPass ? 'CONFIGURED' : 'MISSING';
   } else if (config.email.provider === 'mock') {
     emailStatus = 'CONFIGURED';
   }
+
+  // AI PROVIDER (GEMINI)
+  const aiStatus: ConfigStatus = config.ai.apiKey ? 'CONFIGURED' : 'MISSING';
+
+  // MAPS PROVIDER (GOOGLE MAPS)
+  const mapsStatus: ConfigStatus = config.maps.apiKey ? 'CONFIGURED' : 'MISSING';
 
   // CORS
   const corsStatus: ConfigStatus = config.corsOrigins.length > 0 ? 'CONFIGURED' : 'MISSING';
@@ -263,6 +297,8 @@ export function checkProductionEnvironment(): Record<string, ConfigStatus> {
     VAPID_SUBJECT: vapidSubjectStatus,
     SMS_PROVIDER: smsStatus,
     EMAIL_PROVIDER: emailStatus,
+    GEMINI_API_KEY: aiStatus,
+    GOOGLE_MAPS_API_KEY: mapsStatus,
     CORS_ORIGINS: corsStatus,
   };
 }

@@ -50,10 +50,57 @@ export class SmsService {
       else if (config.sms.gatewayUrl) activeProvider = 'gateway';
     }
 
-    // 3. Twilio
+    // 3. Twilio (Verify API or Messages API)
     if (activeProvider === 'twilio') {
-      if (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken || !config.sms.twilioPhoneNumber) {
+      if (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken) {
         logger.warn('[SMS Service] Twilio provider selected but credentials not configured. SMS not sent.');
+        return {
+          success: false,
+          unconfigured: true,
+          userMessage: defaultUserUnavailableMessage,
+        };
+      }
+
+      // 3A. Twilio Verify Service (Dedicated OTP Route)
+      if (config.sms.twilioVerifyServiceId) {
+        try {
+          const auth = Buffer.from(
+            `${config.sms.twilioAccountSid}:${config.sms.twilioAuthToken}`
+          ).toString('base64');
+          const body = new URLSearchParams({
+            To: cleanTo.startsWith('+') ? cleanTo : `+91${cleanTo.replace(/\D/g, '').slice(-10)}`,
+            Channel: 'sms',
+          });
+
+          const res = await fetch(
+            `https://verify.twilio.com/v2/Services/${config.sms.twilioVerifyServiceId}/Verifications`,
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Basic ${auth}`,
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: body.toString(),
+            }
+          );
+
+          if (!res.ok) {
+            const errData = await res.text();
+            logger.error(`[SMS Service - Twilio Verify Error] HTTP ${res.status}: ${errData}`);
+            return { success: false, error: errData, provider: 'twilio-verify' };
+          }
+
+          logger.info(`[SMS Service] Twilio Verify dispatched successfully to ${maskedPhone}`);
+          return { success: true, provider: 'twilio-verify' };
+        } catch (err: any) {
+          logger.error('[SMS Service - Twilio Verify Exception]', err);
+          return { success: false, error: err?.message, provider: 'twilio-verify' };
+        }
+      }
+
+      // 3B. Standard Twilio Messages API
+      if (!config.sms.twilioPhoneNumber) {
+        logger.warn('[SMS Service] Twilio provider selected but TWILIO_PHONE_NUMBER is missing.');
         return {
           success: false,
           unconfigured: true,
@@ -240,6 +287,177 @@ export class SmsService {
       success: false,
       unconfigured: true,
       userMessage: defaultUserUnavailableMessage,
+    };
+  }
+
+  /**
+   * Health and connectivity check for active SMS / OTP provider without dispatching real SMS.
+   * Never leaks auth tokens or private keys.
+   */
+  static async checkHealth(): Promise<{
+    status: 'configured' | 'unavailable' | 'needs verification';
+    provider: string;
+    details: string;
+    latencyMs?: number;
+  }> {
+    const activeProvider = config.sms.provider;
+    const start = Date.now();
+
+    // 1. Twilio Health Check
+    if (activeProvider === 'twilio') {
+      if (!config.sms.twilioAccountSid || !config.sms.twilioAuthToken) {
+        return {
+          status: 'unavailable',
+          provider: 'twilio',
+          details: 'TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN is missing.',
+        };
+      }
+
+      if (!config.sms.twilioPhoneNumber && !config.sms.twilioVerifyServiceId) {
+        return {
+          status: 'needs verification',
+          provider: 'twilio',
+          details: 'Neither TWILIO_PHONE_NUMBER nor OTP_VERIFY_SERVICE_ID is configured.',
+        };
+      }
+
+      try {
+        const auth = Buffer.from(
+          `${config.sms.twilioAccountSid}:${config.sms.twilioAuthToken}`
+        ).toString('base64');
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${encodeURIComponent(config.sms.twilioAccountSid)}.json`,
+          {
+            method: 'GET',
+            headers: { Authorization: `Basic ${auth}` },
+            signal: controller.signal,
+          }
+        );
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - start;
+
+        if (res.ok) {
+          const type = config.sms.twilioVerifyServiceId ? 'Verify Service' : 'SMS Messaging';
+          return {
+            status: 'configured',
+            provider: 'twilio',
+            details: `Twilio API connection verified (${type}).`,
+            latencyMs,
+          };
+        } else if (res.status === 401 || res.status === 403) {
+          return {
+            status: 'needs verification',
+            provider: 'twilio',
+            details: 'Twilio credentials rejected (HTTP 401/403). Verify Account SID and Auth Token.',
+            latencyMs,
+          };
+        } else {
+          return {
+            status: 'needs verification',
+            provider: 'twilio',
+            details: `Twilio API returned HTTP ${res.status}.`,
+            latencyMs,
+          };
+        }
+      } catch (err: any) {
+        const latencyMs = Date.now() - start;
+        return {
+          status: 'unavailable',
+          provider: 'twilio',
+          details: err?.name === 'AbortError' ? 'Twilio API request timed out (4s).' : 'Unable to reach Twilio API.',
+          latencyMs,
+        };
+      }
+    }
+
+    // 2. Fast2SMS Health Check
+    if (activeProvider === 'fast2sms') {
+      if (!config.sms.fast2smsApiKey) {
+        return {
+          status: 'unavailable',
+          provider: 'fast2sms',
+          details: 'FAST2SMS_API_KEY is missing.',
+        };
+      }
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+        const res = await fetch('https://www.fast2sms.com/dev/wallet', {
+          method: 'POST',
+          headers: { authorization: config.sms.fast2smsApiKey },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        const latencyMs = Date.now() - start;
+
+        if (res.ok) {
+          return {
+            status: 'configured',
+            provider: 'fast2sms',
+            details: 'Fast2SMS API connection verified.',
+            latencyMs,
+          };
+        } else {
+          return {
+            status: 'needs verification',
+            provider: 'fast2sms',
+            details: `Fast2SMS API returned HTTP ${res.status}.`,
+            latencyMs,
+          };
+        }
+      } catch (err: any) {
+        const latencyMs = Date.now() - start;
+        return {
+          status: 'unavailable',
+          provider: 'fast2sms',
+          details: 'Unable to reach Fast2SMS API.',
+          latencyMs,
+        };
+      }
+    }
+
+    // 3. MSG91 Health Check
+    if (activeProvider === 'msg91') {
+      if (!config.sms.msg91AuthKey) {
+        return {
+          status: 'unavailable',
+          provider: 'msg91',
+          details: 'MSG91_AUTH_KEY is missing.',
+        };
+      }
+      return {
+        status: 'configured',
+        provider: 'msg91',
+        details: 'MSG91 Auth Key configured.',
+      };
+    }
+
+    // 4. Mock / Simulated
+    if (activeProvider === 'mock') {
+      if (config.isProduction && process.env.OTP_DEV_MODE !== 'true') {
+        return {
+          status: 'unavailable',
+          provider: 'mock',
+          details: 'SMS provider is set to mock in production without OTP_DEV_MODE=true. Real SMS provider required.',
+        };
+      }
+      return {
+        status: 'configured',
+        provider: 'mock',
+        details: 'Simulated / Safe Mode active. OTP codes logged safely to server logs.',
+      };
+    }
+
+    return {
+      status: 'unavailable',
+      provider: activeProvider || 'none',
+      details: 'No valid SMS or OTP provider configured.',
     };
   }
 }
