@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App';
 import './index.css';
+import { injectSpeedInsights } from '@vercel/speed-insights';
+
+// Initialize Vercel Speed Insights
+injectSpeedInsights();
 
 // Register PWA Service Worker in production or supported browsers
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
