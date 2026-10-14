@@ -10,6 +10,11 @@ jobs:
   backend-checks:
     name: Backend Test & Build
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "file:./dev.db"
+      JWT_ACCESS_SECRET: "rakthasethu_ci_test_access_secret_1234567890"
+      JWT_REFRESH_SECRET: "rakthasethu_ci_test_refresh_secret_0987654321"
+      NODE_ENV: "test"
 
     steps:
       - name: Checkout Code
@@ -26,9 +31,12 @@ jobs:
         working-directory: ./backend
         run: npm ci
 
-      - name: Generate Prisma Client
+      - name: Initialize Test Database & Generate Prisma Client
         working-directory: ./backend
-        run: npx prisma generate
+        run: |
+          node scripts/prepare-db.js
+          npx prisma db push --skip-generate
+          npx prisma generate
 
       - name: Run Backend Unit & Integration Tests
         working-directory: ./backend

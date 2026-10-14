@@ -3,6 +3,7 @@ import { VALID_STATUS_TRANSITIONS } from '../src/modules/requests/requestService
 import { EmailService } from '../src/services/emailService';
 import { SmsService } from '../src/services/smsService';
 import { NotificationService } from '../src/services/notificationService';
+import { config } from '../src/config';
 
 describe('Security, IDOR & Resilience Validation', () => {
   describe('Request State Machine Transition Integrity', () => {
@@ -35,39 +36,50 @@ describe('Security, IDOR & Resilience Validation', () => {
 
     it('generates formatted HTML alert containing urgent blood details', async () => {
       // Testing template generation does not crash
-      const success = await EmailService.sendUrgentMatchAlert(
-        'test@rakthasethu.org',
-        'Rajesh Kumar',
-        {
-          id: 'req-1',
-          bloodGroup: 'B_POSITIVE',
-          unitsRequired: 2,
-          hospitalName: 'Apollo Hospital',
-          hospitalCity: 'Hyderabad',
-          urgency: 'CRITICAL',
-        }
-      );
-      // In mock/development mode, this resolves smoothly
-      expect(typeof success).toBe('boolean');
+      const originalProvider = config.email.provider;
+      (config.email as any).provider = 'mock';
+      try {
+        const success = await EmailService.sendUrgentMatchAlert(
+          'test@rakthasethu.org',
+          'Rajesh Kumar',
+          {
+            id: 'req-1',
+            bloodGroup: 'B_POSITIVE',
+            unitsRequired: 2,
+            hospitalName: 'Apollo Hospital',
+            hospitalCity: 'Hyderabad',
+            urgency: 'CRITICAL',
+          }
+        );
+        expect(typeof success).toBe('boolean');
+      } finally {
+        (config.email as any).provider = originalProvider;
+      }
     });
 
     it('NotificationService executes fail-safe dispatch without throwing', async () => {
-      await expect(
-        NotificationService.notify({
-          userId: 'test-user-id',
-          title: 'System Health Check',
-          message: 'Notification system operational',
-          email: {
-            to: 'test@rakthasethu.org',
-            subject: 'Ping',
-            html: '<p>Ping</p>',
-          },
-          sms: {
-            to: '+919999999999',
-            message: 'Ping',
-          },
-        })
-      ).resolves.not.toThrow();
+      const originalProvider = config.email.provider;
+      (config.email as any).provider = 'mock';
+      try {
+        await expect(
+          NotificationService.notify({
+            userId: 'test-user-id',
+            title: 'System Health Check',
+            message: 'Notification system operational',
+            email: {
+              to: 'test@rakthasethu.org',
+              subject: 'Ping',
+              html: '<p>Ping</p>',
+            },
+            sms: {
+              to: '+919999999999',
+              message: 'Ping',
+            },
+          })
+        ).resolves.not.toThrow();
+      } finally {
+        (config.email as any).provider = originalProvider;
+      }
     });
   });
 });

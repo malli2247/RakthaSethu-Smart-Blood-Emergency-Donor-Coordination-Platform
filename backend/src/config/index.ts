@@ -21,9 +21,7 @@ export const config = {
     .split(',')
     .map((s) => s.trim()),
 
-  databaseUrl:
-    process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/rakthasethu?schema=public',
+  databaseUrl: process.env.DATABASE_URL || 'file:./dev.db',
 
   jwt: {
     accessSecret:
